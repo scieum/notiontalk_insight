@@ -1,0 +1,4 @@
+{
+  "_comment": "검증된 카카오톡 Mac DB 스키마 지문 목록. 비어 있으면 CLAUDE.md 규칙에 따라 kakao-db-reader를 호출하지 않고 kakao-export 폴백으로 간다. fingerprint.py가 계산한 지문이 여기 목록 중 하나와 일치할 때만 A0가 복호화를 진행한다.",
+  "fingerprints": []
+}

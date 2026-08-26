@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  파이프라인 A 전체 (A0~A8) 실행 — 설계서 §4.6.
+  주기: 월/목 09:00. 완료 기준(설계서 §5 V6)이 충족되기 전까지는 launchctl load 하지 않는다.
+
+  TODO (V6):
+    - 아래 /ABSOLUTE/PATH/TO/TalkInsight 를 Mac의 실제 프로젝트 경로로 교체
+    - ProgramArguments를 실제 실행 방식(예: `claude -p "..."` 헤드리스 호출 또는
+      전용 Python 오케스트레이터 스크립트)으로 확정 — 아직 미결정, 이 파일은 템플릿
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.talkinsight.collect_publish</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/bin/env</string>
+        <string>python3</string>
+        <string>/ABSOLUTE/PATH/TO/TalkInsight/scripts/run_cycle.py</string>
+        <string>--pipeline</string>
+        <string>collect_publish</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>/ABSOLUTE/PATH/TO/TalkInsight</string>
+
+    <key>StartCalendarInterval</key>
+    <array>
+        <dict>
+            <key>Weekday</key>
+            <integer>1</integer>
+            <key>Hour</key>
+            <integer>9</integer>
+            <key>Minute</key>
+            <integer>0</integer>
+        </dict>
+        <dict>
+            <key>Weekday</key>
+            <integer>4</integer>
+            <key>Hour</key>
+            <integer>9</integer>
+            <key>Minute</key>
+            <integer>0</integer>
+        </dict>
+    </array>
+
+    <key>StandardOutPath</key>
+    <string>/ABSOLUTE/PATH/TO/TalkInsight/output/logs/launchd_collect_publish.out.log</string>
+    <key>StandardErrorPath</key>
+    <string>/ABSOLUTE/PATH/TO/TalkInsight/output/logs/launchd_collect_publish.err.log</string>
+</dict>
+</plist>

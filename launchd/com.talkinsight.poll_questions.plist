@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  파이프라인 B3~B7 (질문함 폴링·검색·답변생성·검증·기입) 실행 — 설계서 §4.6.
+  주기: 30분 간격 (StartInterval, 캘린더 기준 아님). TODO는 collect_publish.plist와 동일.
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.talkinsight.poll_questions</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/bin/env</string>
+        <string>python3</string>
+        <string>/ABSOLUTE/PATH/TO/TalkInsight/scripts/run_cycle.py</string>
+        <string>--pipeline</string>
+        <string>poll_questions</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>/ABSOLUTE/PATH/TO/TalkInsight</string>
+
+    <key>StartInterval</key>
+    <integer>1800</integer>
+
+    <key>StandardOutPath</key>
+    <string>/ABSOLUTE/PATH/TO/TalkInsight/output/logs/launchd_poll_questions.out.log</string>
+    <key>StandardErrorPath</key>
+    <string>/ABSOLUTE/PATH/TO/TalkInsight/output/logs/launchd_poll_questions.err.log</string>
+</dict>
+</plist>

@@ -1,0 +1,24 @@
+# B1(문서 크롤링) 시드 설정 (설계서 §2.5 B1)
+#
+# 각 항목은 하나의 크롤링 대상 원천이다. source 값은 kb.sqlite의
+# chunks.source ENUM(chat|notion_help|notiontalk_site)과 일치해야 한다.
+
+sources:
+  - name: notion_help
+    source: notion_help
+    seed_urls:
+      - https://www.notion.so/ko/help
+    allowed_domains:
+      - notion.so
+    exclude_patterns: []
+    max_depth: 3
+    # O3 미해결: 한국어 페이지만 vs 영문 포함. 기본값 = 한국어 우선, 없으면 영문.
+    language_preference: ["ko", "en"]
+
+  - name: notiontalk_site
+    source: notiontalk_site
+    seed_urls: []  # TODO: 노션톡 홈페이지 URL 확정 후 기입 (O2: robots.txt·운영진 동의 확인 선행)
+    allowed_domains: []
+    exclude_patterns: []
+    max_depth: 2
+    language_preference: ["ko"]

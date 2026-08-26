@@ -1,0 +1,28 @@
+# 비밀값
+.env
+*.pem
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# 대화 원문·산출물 — PII 포함 가능(C2), 저장소에 올리지 않는다.
+# 폴더 구조 자체는 .gitkeep으로 유지한다.
+/inbox/db_extract/*
+!/inbox/db_extract/.gitkeep
+/inbox/raw/*
+!/inbox/raw/.gitkeep
+/output/**/*
+!/output/**/
+!/output/**/.gitkeep
+
+# OS
+.DS_Store
+Thumbs.db
+
+# 카카오톡 DB 복호화 조사 기록 — 로컬에만 둔다.
+# 저장소가 공개라, 이 문서를 올리면 리버스 엔지니어링 자료를 공개 배포하는 것이 된다
+# (설계서 §1.6 R1 약관 리스크). A0 작업에는 로컬 파일만 있으면 충분하다.
+/docs/db_access_reference.md
