@@ -125,6 +125,12 @@ class BrandContractTest(unittest.TestCase):
         self.assertIn("prefers-reduced-motion: reduce", render_report.CSS)
         self.assertIn("@media print", render_report.CSS)
 
+    def test_issue_header_uses_compact_editorial_hierarchy(self):
+        self.assertIn("font-size: clamp(1.9rem, 3.5vw, 2.75rem)", render_report.CSS)
+        self.assertNotIn("4.35rem", render_report.CSS)
+        self.assertIn("grid-template-columns: repeat(auto-fit, minmax(7rem, 1fr))", render_report.CSS)
+        self.assertIn("border-top: 1px solid var(--color-edge)", render_report.CSS)
+
 
 if __name__ == "__main__":
     unittest.main()

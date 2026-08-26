@@ -496,35 +496,32 @@ code {
 
 .sheet {
   max-width: 72rem; margin: 0 auto;
-  padding: clamp(7rem, 10vw, 9rem) 2.5rem 6rem;
+  padding: clamp(5.25rem, 6vw, 6rem) 2.5rem 6rem;
 }
 
-/* 머리말: 커뮤니티 페이지의 12열 비대칭 구조를 리포트에 맞게 축약한다. */
+/* 머리말: 랜딩 히어로가 아니라 계속 쌓이는 호별 로그의 컴팩트한 발행 머리말. */
 .masthead {
-  display: grid; grid-template-columns: repeat(12, minmax(0, 1fr));
-  column-gap: 2.5rem; align-items: end;
-  padding-bottom: clamp(3rem, 6vw, 5rem);
+  padding: .75rem 0 2.25rem;
 }
-.kicker, .masthead h1, .intro, .status { grid-column: 1 / span 7; }
 .kicker {
-  margin: 0 0 1.5rem; display: flex; align-items: center; gap: .6rem; flex-wrap: wrap;
+  margin: 0 0 1rem; display: flex; align-items: center; gap: .65rem; flex-wrap: wrap;
   color: var(--color-meta); font-size: .75rem; letter-spacing: .02em;
 }
 .kicker .room { color: var(--color-accent); font-weight: 600; }
 .kicker .issue {
-  padding: .14rem .55rem; border-radius: 999px;
-  background: var(--color-accent-soft); color: var(--color-accent);
-  font-size: .6875rem; font-weight: 600; font-variant-numeric: tabular-nums;
+  padding-left: .65rem; border-left: 1px solid var(--color-edge);
+  color: var(--color-dark); font-size: .75rem; font-weight: 600;
+  font-variant-numeric: tabular-nums;
 }
 .kicker .period { font-variant-numeric: tabular-nums; }
 h1 {
-  margin: 0 0 1.35rem;
-  font-size: clamp(2.4rem, 5.3vw, 4.35rem); font-weight: 600;
-  line-height: 1.08; letter-spacing: -.045em; text-wrap: balance;
+  margin: 0 0 1rem; max-width: 50rem;
+  font-size: clamp(1.9rem, 3.5vw, 2.75rem); font-weight: 600;
+  line-height: 1.14; letter-spacing: -.04em; text-wrap: balance;
 }
 .intro {
-  margin: 0 0 1.75rem; max-width: 38rem;
-  color: var(--color-sub); font-size: 1.0625rem; font-weight: 300;
+  margin: 0 0 1.25rem; max-width: 44rem;
+  color: var(--color-sub); font-size: 1rem; font-weight: 300;
   line-height: 1.75; letter-spacing: -.02em;
 }
 .status {
@@ -539,21 +536,21 @@ h1 {
 }
 .badge-quiet { background: transparent; color: var(--color-meta); }
 .stats {
-  margin: 0;
-  grid-column: 9 / -1; grid-row: 1 / span 4;
-  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
-  overflow: hidden; border: 1px solid var(--color-edge); border-radius: 1rem;
-  background: var(--color-edge); gap: 1px; box-shadow: var(--shadow-float);
+  margin: 2rem 0 0; padding: .9rem 0;
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(7rem, 1fr));
+  border-top: 1px solid var(--color-edge); border-bottom: 1px solid var(--color-edge);
 }
-.stats-5 .stat:last-child { grid-column: 1 / -1; min-height: 5.5rem; }
+.stats-5 .stat:last-child { grid-column: auto; min-height: auto; }
 .stat {
-  min-height: 7rem; padding: 1.25rem;
-  display: flex; flex-direction: column; justify-content: space-between;
-  background: var(--color-white);
+  min-height: auto; padding: .25rem 1.25rem;
+  display: flex; flex-direction: column; justify-content: flex-start; gap: .25rem;
+  border-right: 1px solid var(--color-edge);
 }
+.stat:first-child { padding-left: 0; }
+.stat:last-child { border-right: 0; }
 .num {
   order: -1; margin: 0;
-  font-size: clamp(1.65rem, 3vw, 2.25rem); font-weight: 600;
+  font-size: 1.4rem; font-weight: 600;
   line-height: 1; letter-spacing: -.04em; font-variant-numeric: tabular-nums;
 }
 .lbl { color: var(--color-meta); font-size: .75rem; }
@@ -758,9 +755,7 @@ mark { padding: 0; background: none; color: var(--color-dark); }
 }
 @media (max-width: 54rem) {
   .site-chrome-inner { padding: 0 1.5rem; }
-  .sheet { padding: 6.5rem 1.5rem 5rem; }
-  .masthead { display: block; }
-  .stats { margin-top: 2.25rem; }
+  .sheet { padding: 4.75rem 1.5rem 5rem; }
   section { display: block; padding: 4rem 0; }
   .sec-head { margin-bottom: 1.75rem; }
   .sec-desc { max-width: 34rem; }
@@ -770,10 +765,17 @@ mark { padding: 0; background: none; color: var(--color-dark); }
   .site-links { gap: 1rem; }
   .product-name { display: none; }
   .sheet { padding-right: 1rem; padding-left: 1rem; }
-  h1 { font-size: clamp(2.15rem, 11.5vw, 3rem); }
-  .intro { font-size: 1rem; }
+  .masthead { padding: .75rem 0 2rem; }
+  h1 { font-size: clamp(1.75rem, 8.5vw, 2.15rem); }
   .status-note { flex-basis: 100%; margin: .15rem 0 0; }
-  .stat { min-height: 6rem; padding: 1rem; }
+  .stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    padding: 0; overflow: hidden; border: 1px solid var(--color-edge); border-radius: .75rem;
+    background: var(--color-edge); gap: 1px;
+  }
+  .stat { min-height: 5rem; padding: .85rem 1rem; border: 0; background: var(--color-white); }
+  .stat:first-child { padding-left: 1rem; }
+  .stats-5 .stat:last-child { grid-column: 1 / -1; }
   .section-index { margin-right: -1rem; margin-left: -1rem; padding-right: 1rem; padding-left: 1rem; }
   section { padding: 3.5rem 0; }
   .tip-grid, .pipe { grid-template-columns: 1fr; }
