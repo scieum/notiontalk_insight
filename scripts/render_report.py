@@ -86,8 +86,8 @@ SECTIONS = [
     ("actions", "Actions", "하기로 한 것",
      "오픈채팅방에서 누가 무엇을 하기로 했는지 남겨둡니다.",
      "이번 주에는 정해진 약속이 없었습니다."),
-    ("involved", "Get Involved", "선생님, 노션 같이 배워요",
-     "다음 주 리포트는 이번 주 대화로 만들어집니다.", ""),
+    ("involved", "Get Involved", "선생님, 같이 노션 배워볼래요?",
+     "혼자 헤매면 오래 걸리는 일도 함께하면 금방 풀립니다.", ""),
 ]
 
 
@@ -294,27 +294,20 @@ def render_body(data: dict) -> str:
     inner = f'<ul class="act-list">{inner}</ul>' if actions else _empty(SECTIONS[4][4])
     blocks.append(_section(*SECTIONS[4][:4], inner, len(actions) or None))
 
-    # 6. 함께하기 — 대화에서 생성하지 않는 유일한 섹션. 매 호 같은 자리·같은 문구다.
-    n_open = len(unresolved)
-    open_line = (
-        f"이번 주에 아직 답을 못 찾은 질문이 {n_open}개 있어요. "
-        "아시는 게 있으면 한 줄만 남겨주셔도 큰 도움이 됩니다."
-        if n_open else
-        "궁금한 게 생기면 편하게 물어보세요. 같이 찾아보면 금방입니다."
-    )
+    # 6. 함께하기 — 매 호 **한 글자도 달라지지 않는** 고정 블록이다.
+    # 그 주 숫자(미해결 개수 등)를 넣지 않는다. 운영자 지정(2026-08-27):
+    # "여기는 항상 통일할거야".
     _id, _label, _ko, _desc = SECTIONS[5][:4]
     blocks.append(f"""<section id="{_id}" class="cta">
   <p class="sec-label">{esc(_label)}</p>
   <h2>{esc(_ko)}</h2>
-  <p class="cta-lede">혼자 헤매면 오래 걸리는 일도 함께하면 금방 풀립니다.<br>
-     {open_line}</p>
+  <p class="cta-lede">{esc(_desc)}</p>
   <div class="cta-buttons">
     <a class="btn btn-primary" href="{OPENCHAT_URL}" target="_blank" rel="noopener">
       노션하는 교사톡 들어가기</a>
     <a class="btn btn-ghost" href="{HOMEPAGE_URL}" target="_blank" rel="noopener">
       노션톡 홈페이지 둘러보기</a>
   </div>
-  <p class="cta-foot">근거가 필요한 질문은 노션 질문함에 올려주세요. 공식 문서와 오픈채팅방 대화를 함께 찾아 답을 드립니다.</p>
 </section>""")
     return "\n".join(blocks)
 
@@ -603,7 +596,6 @@ mark { background: none; color: var(--text); padding: 0; }
 .btn:active { transform: none; }
 .btn-primary { background: var(--accent-2); color: #fff; }
 .btn-ghost { background: transparent; color: var(--accent); border-color: var(--accent); }
-.cta-foot { margin: 1.5rem auto 0; max-width: 30rem; font-size: .8125rem; color: var(--text-3); }
 
 /* ── 판권 */
 .colophon {
