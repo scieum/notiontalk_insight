@@ -368,6 +368,27 @@ FONT_FACE = """@font-face {{
 }}"""
 
 
+# 아티팩트 게시용 조각. 게시 시점에 <!doctype>/<html>/<head>/<body>가 자동으로
+# 씌워지므로, 완결 문서를 그대로 올리면 문서가 이중으로 중첩된다.
+# 보관본(TEMPLATE)은 완결 문서 그대로 두고 — 파일로 열거나 노션에 넣을 때는 그게 맞다 —
+# 미리보기만 이 조각을 쓴다. 내용·스타일은 완전히 같다.
+FRAGMENT_START_RE = re.compile(r"<body>\s*(.*)\s*</body>", re.S)
+
+
+def to_fragment(full_html: str) -> str:
+    """완결 문서에서 <title> + <style> + body 내용만 뽑아 조각으로 만든다."""
+    title = re.search(r"<title>(.*?)</title>", full_html, re.S)
+    style = re.search(r"<style>(.*?)</style>", full_html, re.S)
+    body = FRAGMENT_START_RE.search(full_html)
+    if not (title and style and body):
+        raise RuntimeError("조각을 만들 수 없습니다 — TEMPLATE 구조가 바뀌었는지 확인하십시오.")
+    return (
+        f"<title>{title.group(1)}</title>\n"
+        f"<style>{style.group(1)}</style>\n"
+        f"{body.group(1).strip()}\n"
+    )
+
+
 TEMPLATE = """<!doctype html>
 <html lang="ko">
 <head>
@@ -848,6 +869,8 @@ def main() -> None:
     ap.add_argument("--issue", type=int, default=None, help="몇 호인지. 생략하면 자동으로 센다")
     ap.add_argument("--out", help="추가로 복사해 둘 경로 (생략 가능). 보관본은 항상 output/reports/에 쌓인다")
     ap.add_argument("--no-archive", action="store_true", help="보관본을 남기지 않는다")
+    ap.add_argument("--fragment", metavar="경로",
+                    help="아티팩트 게시용 조각(<title>+<style>+본문)을 이 경로에 함께 쓴다")
     args = ap.parse_args()
 
     data = json.loads(Path(args.final).read_text(encoding="utf-8"))
@@ -913,6 +936,12 @@ def main() -> None:
         Path(args.out).parent.mkdir(parents=True, exist_ok=True)
         Path(args.out).write_text(out_html, encoding="utf-8")
         written.append(Path(args.out))
+
+    if args.fragment:
+        frag = Path(args.fragment)
+        frag.parent.mkdir(parents=True, exist_ok=True)
+        frag.write_text(to_fragment(out_html), encoding="utf-8")
+        written.append(frag)
 
     print(f"[render] {issue}호 ({size/1024:.0f} KB, 글꼴 {len(font_b64)/1024:.0f} KB)")
     for w in written:
