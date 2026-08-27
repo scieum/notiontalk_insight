@@ -1,0 +1,59 @@
+# 노션 발행 설정 (A7)
+#
+# 이 파일이 있는 이유: 노션 DB의 속성 이름은 워크스페이스 주인이 언제든 바꾼다.
+# 코드에 이름을 박아두면 속성 하나 개명할 때마다 코드를 고쳐야 한다. 그래서
+# **매핑만 여기 두고 코드는 이 파일을 읽는다.**
+#
+# 채우는 방법:
+#   1) 통합을 만들고(notion.so/my-integrations) DB에 연결한 뒤 토큰을 등록한다
+#        security add-generic-password -a "$USER" -s talkinsight-notion -w
+#   2) 실제 스키마를 확인한다 (읽기만 한다)
+#        python3 .claude/skills/notion-publish/scripts/probe_db.py <DB URL>
+#   3) 출력에 나온 속성 이름을 아래에 그대로 옮긴다
+#
+# publish_report.py는 발행 전에 이 매핑을 **실제 스키마와 대조**한다.
+# 이름이 틀렸거나 타입이 안 맞으면 아무것도 만들지 않고 멈춘다.
+
+# 발행 대상 데이터베이스. URL을 그대로 넣어도 되고 32자 id만 넣어도 된다.
+database: "https://app.notion.com/p/ioooss/37ddd1dcd64480bc99ccca2cafcd31ed?v=37ddd1dcd64480e88042000c8519b06a"
+
+# ── 속성 매핑 ───────────────────────────────────────────────────────────
+# 값을 비워두면(`null`) 그 속성은 건드리지 않는다. 없는 속성을 코드가 새로
+# 만들지 않는다 — 남의 워크스페이스 스키마를 마음대로 바꾸지 않는다.
+properties:
+  # 제목 속성(type: title)의 이름. 필수.
+  # probe_db.py 출력에서 [제목] 표시가 붙은 것.
+  title: "이름"
+
+  # 아래는 전부 선택. 해당 속성이 DB에 **이미 있을 때만** 이름을 적는다.
+  status: null        # select 또는 status 타입. 값은 status_draft_value로 들어간다
+  issue_number: null  # number 타입
+  period_start: null  # date 타입
+  period_end: null    # date 타입 (하나로 합치려면 period_range를 쓴다)
+  period_range: null  # date 타입 하나에 시작~종료를 함께 넣을 때
+  tags: null          # multi_select 타입
+  url: null           # url 타입
+
+# ── 제목 형식 ──────────────────────────────────────────────────────────
+# 속성 '이름'이 아니라 '무엇을 넣을지'라서 properties 밖에 둔다.
+#   hook   — 후킹 제목 ("AI로 수업 자료 만들기, 원하는 결과는 어떻게 얻을까요?")
+#   formal — 사무적 제목 ("노션하는 교사톡 커뮤니티 리포트 (...)")
+#   issue  — "1호 · 2026.08.19 ~ 2026.08.26"
+title_source: hook
+
+# 제목 앞에 호수를 붙일지. true면 "1호 · AI로 수업 자료..."
+title_prefix_issue: true
+
+# 상태 속성에 넣을 값. **절대 '발행'로 두지 말 것** — 리포트 자동 발행은
+# 금지되어 있고(CLAUDE.md C5), 사람이 검토한 뒤에만 바꾼다.
+status_draft_value: "초안"
+
+# tags 속성이 있을 때 붙일 값. 설계서가 요구하는 `자동생성`을 기본으로 둔다.
+auto_tags:
+  - "자동생성"
+
+# 같은 호를 두 번 만들지 않기 위한 중복 확인 방법.
+#   manifest — output/published/의 매니페스트만 본다 (기본, 노션 조회 없음)
+#   title    — DB에서 같은 제목이 있는지 조회한다 (매니페스트가 없어도 막힌다)
+#   both     — 둘 다
+duplicate_check: both
