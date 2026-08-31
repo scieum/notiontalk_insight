@@ -62,8 +62,9 @@ FORMAT_A_SYSTEM_RE = re.compile(
     r"(?P<ap>오전|오후)\s*(?P<h>\d{1,2}):(?P<mi>\d{2}),\s*(?P<text>.*)$"
 )
 
-# 헤더/메타 라인 (파싱률 분모에서 제외)
-SKIP_LINE_RE = re.compile(r"^(카카오톡 대화|저장한 날짜\s*:)")
+# 헤더/메타 라인 (파싱률 분모에서 제외). 첫 줄("<방이름> 님과 카카오톡 대화")은
+# 방 이름이 가변이라 접두사 매칭이 불가능해 접미사로 잡는다(실기기 샘플로 확인, 2026-08-31).
+SKIP_LINE_RE = re.compile(r"^(카카오톡 대화|저장한 날짜\s*:)|님과 카카오톡 대화$")
 
 
 def _to_24h(ap: str, h: int) -> int:
@@ -92,7 +93,7 @@ def parse_txt(path: Path) -> tuple[list[NormalizedMessage], dict]:
         for raw_line in f:
             line = raw_line.rstrip("\n\r")
             stripped = line.strip()
-            if not stripped or SKIP_LINE_RE.match(stripped):
+            if not stripped or SKIP_LINE_RE.search(stripped):
                 continue
 
             date_header = FORMAT_B_DATE_RE.search(stripped)
@@ -189,6 +190,17 @@ def parse_txt(path: Path) -> tuple[list[NormalizedMessage], dict]:
                         links=[],
                     )
                 )
+                stats["matched"] += 1
+                continue
+
+            # 어떤 형식에도 안 맞고 시스템 메시지도 아니면, 카카오톡 내보내기 특성상
+            # 줄바꿈을 포함한 메시지의 후속 줄일 가능성이 가장 높다(실기기 샘플로 확인,
+            # 2026-08-31) — 직전 메시지 본문에 이어붙인다. 직전 메시지가 없으면(파일
+            # 시작부의 알 수 없는 라인 등) 진짜 미파싱으로 카운트한다.
+            if messages:
+                prev = messages[-1]
+                prev.text = f"{prev.text}\n{stripped}"
+                prev.links.extend(_extract_links(stripped))
                 stats["matched"] += 1
                 continue
 
