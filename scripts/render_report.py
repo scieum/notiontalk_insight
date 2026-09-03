@@ -88,8 +88,8 @@ SECTIONS = [
     ("actions", "Actions", "하기로 한 것",
      "오픈채팅방에서 누가 무엇을 하기로 했는지 남겨둡니다.",
      "이번 주에는 정해진 약속이 없었습니다."),
-    ("involved", "Get Involved", "선생님, 같이 노션 배워볼래요?",
-     "혼자 헤매면 오래 걸리는 일도 함께하면 금방 풀립니다.", ""),
+    ("involved", "Join the Conversation", "노션하는 교사톡 참여하기",
+     "질문하고, 답을 나누고, 다음 인사이트에 함께해주세요.", ""),
 ]
 
 
@@ -148,6 +148,12 @@ OPENCHAT_URL = "https://open.kakao.com/o/gpSvPKGg"
 HOMEPAGE_URL = "https://www.notiontalk.com/"
 COMMUNITY_URL = "https://www.notiontalk.com/contents/community/"
 
+CHAT_ICON_SVG = """<svg viewBox="0 0 24 24" aria-hidden="true" fill="none"
+  stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M20 15a3 3 0 0 1-3 3H9l-5 3v-6a3 3 0 0 1-1-2.2V7a3 3 0 0 1 3-3h11a3 3 0 0 1 3 3z"/>
+  <path d="M8 9h8M8 13h5"/>
+</svg>"""
+
 
 def _yymmdd(iso_date: str) -> str:
     """ISO 날짜 -> yymmdd 6자 (파일명용)."""
@@ -158,6 +164,23 @@ def _yymmdd(iso_date: str) -> str:
 def _display(iso_date: str) -> str:
     """ISO 날짜 -> 2026.08.19 (화면용). 매 호 같은 형식으로 찍는다."""
     return iso_date.replace("-", ".") if len(iso_date) == 10 else iso_date
+
+
+def display_period(start_iso: str, end_iso: str) -> str:
+    """기간을 `2026.08.19 - 08.26`처럼 하이픈으로 표시한다.
+
+    같은 연도면 종료일의 연도는 반복하지 않는다. 연도가 달라지면 의미가 사라지지
+    않도록 종료일도 전체 날짜로 표시한다. 날짜가 하나뿐이면 단일 날짜만 반환한다.
+    """
+    start = _display(start_iso)
+    end = _display(end_iso)
+    if not start:
+        return end
+    if not end or start == end:
+        return start
+    if len(start_iso) == 10 and len(end_iso) == 10 and start_iso[:4] == end_iso[:4]:
+        end = end[5:]
+    return f"{start} - {end}"
 
 
 def data_range(period_id: str, since: str | None, until: str | None) -> tuple[str, str]:
@@ -189,6 +212,15 @@ def data_range(period_id: str, since: str | None, until: str | None) -> tuple[st
 
     start = (since or lo or "")[:10]
     end = (until or hi or lo or since or "")[:10]
+    # final.json만 전달된 검토 렌더에서도 기간이 비지 않도록 표준 period_id를 폴백으로
+    # 해석한다. `YYYYMMDD_YYYYMMDD` 이외의 식별자는 기존처럼 빈 값으로 둔다.
+    period_match = re.fullmatch(r"(\d{8})_(\d{8})", period_id or "")
+    if period_match:
+        parsed = [
+            f"{raw[:4]}-{raw[4:6]}-{raw[6:8]}" for raw in period_match.groups()
+        ]
+        start = start or parsed[0]
+        end = end or parsed[1]
     return start, end
 
 
@@ -297,19 +329,18 @@ def render_body(data: dict) -> str:
     inner = f'<ul class="act-list">{inner}</ul>' if actions else _empty(SECTIONS[4][4])
     blocks.append(_section(*SECTIONS[4][:4], inner, len(actions) or None))
 
-    # 6. 함께하기 — 매 호 **한 글자도 달라지지 않는** 고정 블록이다.
-    # 그 주 숫자(미해결 개수 등)를 넣지 않는다. 운영자 지정(2026-08-27):
-    # "여기는 항상 통일할거야".
-    _id, _label, _ko, _desc = SECTIONS[5][:4]
+    # 6. 함께하기 — 데이터와 무관하게 매 호 같은 문구·실제 주소를 강제한다.
+    # 생성 모델이 CTA를 쓰거나 생략할 수 없고, 버튼이 막혀도 주소를 복사할 수 있다.
+    _id = SECTIONS[5][0]
     blocks.append(f"""<section id="{_id}" class="cta">
-  <p class="sec-label">{esc(_label)}</p>
-  <h2>{esc(_ko)}</h2>
-  <p class="cta-lede">{esc(_desc)}</p>
+  <p class="sec-label">Join the conversation</p>
+  <h2>이 인사이트는 노션하는 교사톡에서 시작됐습니다</h2>
+  <p class="cta-lede">질문하고, 답을 나누고, 다음 인사이트에 함께해주세요.</p>
+  <a class="openchat-url" href="{OPENCHAT_URL}" target="_blank" rel="noopener noreferrer">
+    {OPENCHAT_URL}</a>
   <div class="cta-buttons">
-    <a class="btn btn-primary" href="{OPENCHAT_URL}" target="_blank" rel="noopener">
-      노션하는 교사톡 들어가기</a>
-    <a class="btn btn-ghost" href="{HOMEPAGE_URL}" target="_blank" rel="noopener">
-      노션톡 홈페이지 둘러보기</a>
+    <a class="btn btn-primary" href="{OPENCHAT_URL}" target="_blank" rel="noopener noreferrer">
+      노션하는 교사톡 참여하기</a>
   </div>
 </section>""")
     return "\n".join(blocks)
@@ -339,13 +370,13 @@ def render(data: dict, week_label: str, issue: int) -> str:
     stats_class = f"stats stats-{min(len(stats), 6)}"
 
     head = f"""<header class="masthead">
-  <p class="kicker">
-    <span class="room">{esc(room_name())}</span>
-    <span class="issue">{issue}호</span>
-    <span class="period">{esc(week_label)}</span>
-  </p>
+  <p class="series-label">Notion Talk · Community Insight</p>
   <h1>{esc(_to_week(report.get('hook_title', '')))}</h1>
   <p class="intro">{esc(_to_week(report.get('intro', '')))}</p>
+  <div class="publication-meta">
+    <span class="community-mark">{CHAT_ICON_SVG}</span>
+    <span><strong>{esc(room_name())}</strong> · {issue}호 · {esc(week_label)}</span>
+  </div>
   <p class="status"><span class="badge">초안</span>
      <span class="badge badge-quiet">자동생성</span>
      <span class="status-note">운영자 검토 전이며, 이 상태로는 발행되지 않습니다.</span></p>
@@ -357,6 +388,167 @@ def render(data: dict, week_label: str, issue: int) -> str:
     )
     index = f'<nav class="section-index" aria-label="리포트 목차">{index_links}</nav>'
     return head + "\n" + index + "\n" + render_body(data)
+
+
+EMAIL_FONT = "Pretendard, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans KR', 'Malgun Gothic', sans-serif"
+EMAIL_BORDER = "#E7E5E4"
+EMAIL_DARK = "#1C1917"
+EMAIL_SUB = "#57534E"
+EMAIL_META = "#746F6A"
+EMAIL_ACCENT = "#1F5D5C"
+EMAIL_ACCENT_SOFT = "#E8F0EF"
+
+
+def _email_section(label: str, title: str, desc: str, inner: str, count: int | None) -> str:
+    count_html = (
+        f'<span style="margin-left:6px;padding:2px 6px;border-radius:999px;'
+        f'background:{EMAIL_ACCENT_SOFT};color:{EMAIL_ACCENT};letter-spacing:0;">{count}</span>'
+        if count else ""
+    )
+    return f"""<tr><td style="padding:38px 0;border-bottom:1px solid {EMAIL_BORDER};">
+  <p style="margin:0 0 8px;color:{EMAIL_ACCENT};font-size:10px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;">{esc(label)}{count_html}</p>
+  <h2 style="margin:0;color:{EMAIL_DARK};font-size:22px;line-height:1.3;letter-spacing:-.035em;">{esc(title)}</h2>
+  <p style="margin:7px 0 22px;color:{EMAIL_META};font-size:12px;line-height:1.65;">{esc(desc)}</p>
+  {inner}
+</td></tr>"""
+
+
+def _email_tip(text: str | None) -> str:
+    if not text:
+        return ""
+    return f"""<div style="margin-top:13px;padding:11px 12px;border-radius:8px;background:{EMAIL_ACCENT_SOFT};color:{EMAIL_DARK};font-size:13px;line-height:1.65;">
+  <strong style="display:block;margin-bottom:3px;color:{EMAIL_ACCENT};font-size:9px;letter-spacing:.1em;text-transform:uppercase;">이렇게 써보세요</strong>
+  {esc(text)}
+</div>"""
+
+
+def render_email_body(data: dict) -> str:
+    """`final.json`의 모든 항목을 640px 이메일 한 열로 렌더한다."""
+    report = data.get("report") or {}
+    sections = report.get("sections") or {}
+    rows: list[str] = []
+
+    topics = sections.get("topics") or []
+    topic_rows = "".join(
+        f"""<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-top:1px solid {EMAIL_BORDER};">
+<tr><td width="38" style="padding:15px 8px 15px 0;vertical-align:top;color:{EMAIL_ACCENT};font-size:11px;font-weight:700;">{i:02d}</td>
+<td style="padding:15px 0;color:{EMAIL_DARK};font-size:14px;line-height:1.55;"><strong>{esc(t.get('topic', ''))}</strong><br><span style="color:{EMAIL_SUB};font-size:13px;">{esc(t.get('why', ''))}</span></td></tr></table>"""
+        for i, t in enumerate(topics, 1)
+    )
+    rows.append(_email_section(*SECTIONS[0][1:4], topic_rows or esc(SECTIONS[0][4]), len(topics) or None))
+
+    faq = data.get("faq") or []
+    faq_rows = "".join(
+        f"""<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 10px;border:1px solid {EMAIL_BORDER};border-radius:10px;">
+<tr><td style="padding:18px;color:{EMAIL_DARK};font-size:14px;line-height:1.65;">
+  <p style="margin:0 0 9px;font-weight:600;"><span style="display:inline-block;margin-right:7px;padding:1px 6px;border-radius:5px;background:{EMAIL_ACCENT};color:#fff;font-size:10px;">Q</span>{esc(f.get('question', ''))}</p>
+  <p style="margin:0;color:{EMAIL_SUB};">{esc(f.get('answer', ''))}</p>
+  {_email_tip(f.get('practical_tip'))}
+</td></tr></table>"""
+        for f in faq
+    )
+    rows.append(_email_section(*SECTIONS[1][1:4], faq_rows or esc(SECTIONS[1][4]), len(faq) or None))
+
+    unresolved = sections.get("unresolved") or data.get("unresolved") or []
+    open_rows = "".join(
+        f"""<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 8px;border:1px solid {EMAIL_BORDER};border-radius:8px;">
+<tr><td width="28" style="padding:13px 0 13px 14px;color:{EMAIL_ACCENT};font-size:14px;vertical-align:top;">○</td>
+<td style="padding:13px 14px 13px 4px;color:{EMAIL_DARK};font-size:13px;line-height:1.6;">{esc(u.get('question', ''))}</td></tr></table>"""
+        for u in unresolved
+    )
+    rows.append(_email_section(*SECTIONS[2][1:4], open_rows or esc(SECTIONS[2][4]), len(unresolved) or None))
+
+    tips = data.get("tips") or []
+    grouped: dict[str, list[dict]] = {}
+    for tip in tips:
+        grouped.setdefault((tip.get("feature_tags") or ["기타"])[0], []).append(tip)
+    tip_groups = []
+    for tag, group in sorted(grouped.items(), key=lambda pair: (-len(pair[1]), pair[0])):
+        cards = "".join(
+            f"""<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 9px;border:1px solid {EMAIL_BORDER};border-radius:9px;">
+<tr><td style="padding:16px;color:{EMAIL_DARK};font-size:13px;line-height:1.65;">
+  <strong style="display:block;margin-bottom:5px;font-size:14px;">{esc(t.get('title', ''))}</strong>
+  <span style="color:{EMAIL_SUB};">{esc(t.get('body', ''))}</span>
+  {_email_tip(t.get('practical_tip'))}
+</td></tr></table>"""
+            for t in group
+        )
+        tip_groups.append(
+            f'<p style="margin:18px 0 8px;color:{EMAIL_META};font-size:10px;letter-spacing:.1em;">'
+            f'{esc(tag)} · {len(group)}</p>{cards}'
+        )
+    rows.append(_email_section(*SECTIONS[3][1:4], "".join(tip_groups) or esc(SECTIONS[3][4]), len(tips) or None))
+
+    actions = data.get("actions") or []
+    action_rows = "".join(
+        f"""<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 8px;border:1px solid {EMAIL_BORDER};border-radius:8px;">
+<tr><td width="28" style="padding:13px 0 13px 14px;color:{EMAIL_ACCENT};font-size:13px;vertical-align:top;">□</td>
+<td style="padding:13px 14px 13px 4px;color:{EMAIL_DARK};font-size:13px;line-height:1.6;">{esc(a.get('text', ''))}
+  <span style="display:block;margin-top:4px;color:{EMAIL_META};font-size:11px;">{esc(a.get('owner_nickname') or '미지정')}{' · ' + esc(a.get('due')) if a.get('due') else ''}</span>
+</td></tr></table>"""
+        for a in actions
+    )
+    rows.append(_email_section(*SECTIONS[4][1:4], action_rows or esc(SECTIONS[4][4]), len(actions) or None))
+
+    rows.append(f"""<tr><td style="padding:38px 0 8px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:{EMAIL_ACCENT};border-radius:10px;">
+<tr><td style="padding:25px 24px;color:#fff;">
+  <p style="margin:0 0 7px;color:rgba(255,255,255,.72);font-size:9px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;">Join the conversation</p>
+  <h2 style="margin:0 0 7px;color:#fff;font-size:21px;line-height:1.35;letter-spacing:-.035em;">이 인사이트는 노션하는 교사톡에서 시작됐습니다</h2>
+  <p style="margin:0 0 9px;color:rgba(255,255,255,.78);font-size:13px;line-height:1.65;">질문하고, 답을 나누고, 다음 인사이트에 함께해주세요.</p>
+  <p style="margin:0 0 18px;font-size:11px;line-height:1.5;"><a href="{OPENCHAT_URL}" target="_blank" style="color:rgba(255,255,255,.8);text-decoration:underline;">{OPENCHAT_URL}</a></p>
+  <table role="presentation" cellpadding="0" cellspacing="0"><tr><td style="border-radius:999px;background:#fff;"><a href="{OPENCHAT_URL}" target="_blank" style="display:inline-block;padding:11px 17px;color:{EMAIL_ACCENT};font-size:12px;font-weight:700;text-decoration:none;">노션하는 교사톡 참여하기</a></td></tr></table>
+</td></tr></table>
+</td></tr>""")
+    return "\n".join(rows)
+
+
+def _email_stat(label: str, value: int | str) -> str:
+    return f"""<td width="33.333%" style="padding:15px;border-right:1px solid {EMAIL_BORDER};vertical-align:top;">
+  <strong style="display:block;color:{EMAIL_DARK};font-size:18px;line-height:1;">{esc(str(value))}</strong>
+  <span style="display:block;margin-top:6px;color:{EMAIL_META};font-size:10px;">{esc(label)}</span>
+</td>"""
+
+
+def render_email_document(data: dict, week_label: str, issue: int) -> str:
+    """뉴스레터 규격의 완결된 이메일 검토용 HTML을 만든다. 발송은 하지 않는다."""
+    report = data.get("report") or {}
+    sections = report.get("sections") or {}
+    stats = sections.get("stats") or {}
+    message_count = stats.get("메시지", stats.get("메시지 수", 0))
+    body = render_email_body(data)
+    title = _to_week(report.get("hook_title", ""))
+    intro = _to_week(report.get("intro", ""))
+    stat_cells = "".join(
+        (
+            _email_stat("메시지", message_count),
+            _email_stat("해결된 질문", len(data.get("faq") or [])),
+            _email_stat("실무 팁", len(data.get("tips") or [])),
+        )
+    )
+    # 마지막 셀의 오른쪽 경계는 이메일 클라이언트에서 문제를 만들지 않으므로 그대로 둔다.
+    return f"""<!doctype html>
+<html lang="ko">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>{html.escape(title)}</title></head>
+<body style="margin:0;padding:0;background:#F4F4F4;font-family:{EMAIL_FONT};">
+<div style="display:none;max-height:0;overflow:hidden;opacity:0;">{html.escape(intro)}</div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="padding:32px 16px;background:#F4F4F4;"><tr><td align="center">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:640px;background:#fff;">
+    <tr><td style="padding:10px 38px;background:{EMAIL_DARK};color:#fff;font-size:10px;letter-spacing:.12em;">검토용 이메일 미리보기 · 자동 발송되지 않습니다</td></tr>
+    <tr><td style="padding:32px 38px 23px;border-bottom:1px solid {EMAIL_BORDER};">
+      <p style="margin:0 0 10px;color:#A8A29E;font-size:11px;letter-spacing:.2em;text-transform:uppercase;">Notion Talk · Community Insight</p>
+      <h1 style="margin:0;color:{EMAIL_DARK};font-size:30px;font-weight:600;line-height:1.17;letter-spacing:-.035em;">{esc(title)}</h1>
+      <p style="margin:12px 0 0;color:{EMAIL_SUB};font-size:15px;line-height:1.65;">{esc(intro)}</p>
+      <p style="margin:15px 0 0;color:{EMAIL_META};font-size:12px;line-height:1.5;"><strong style="color:{EMAIL_DARK};">{esc(room_name())}</strong> · {issue}호 · {esc(week_label)}</p>
+    </td></tr>
+    <tr><td style="padding:0 38px;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-bottom:1px solid {EMAIL_BORDER};"><tr>{stat_cells}</tr></table></td></tr>
+    <tr><td style="padding:0 38px;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0">{body}</table></td></tr>
+    <tr><td style="padding:21px 38px 28px;border-top:1px solid {EMAIL_BORDER};color:#A8A29E;font-size:11px;line-height:1.65;">
+      이 파일은 발송 전 검토용입니다. 사람 승인 없이 자동 발송되지 않습니다.
+    </td></tr>
+  </table>
+</td></tr></table>
+</body></html>"""
 
 
 FONT_FACE = """@font-face {{
@@ -453,7 +645,7 @@ CSS = """
 html { scroll-behavior: smooth; }
 body {
   margin: 0;
-  background: var(--color-paper);
+  background: var(--color-white);
   color: var(--color-dark);
   font-family: "Pretendard", "Pretendard Variable", -apple-system, BlinkMacSystemFont,
                "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
@@ -492,7 +684,7 @@ code {
   position: fixed; inset: 0 0 auto; z-index: 40;
   height: 3.5rem;
   border-bottom: 1px solid color-mix(in srgb, var(--color-edge) 85%, transparent);
-  background: color-mix(in srgb, var(--color-paper) 90%, transparent);
+  background: color-mix(in srgb, var(--color-white) 94%, transparent);
   -webkit-backdrop-filter: blur(10px);
   backdrop-filter: blur(10px);
 }
@@ -519,34 +711,40 @@ code {
   max-width: 72rem; margin: 0 auto;
   padding: clamp(5.25rem, 6vw, 6rem) 2.5rem 6rem;
 }
+.masthead, .section-index, .sheet > section, .colophon { max-width: 42rem; }
 
-/* 머리말: 랜딩 히어로가 아니라 계속 쌓이는 호별 로그의 컴팩트한 발행 머리말. */
+/* 현재 노션톡 뉴스레터 상세와 같은 42rem 발행 헤더. */
 .masthead {
-  padding: .75rem 0 2.25rem;
+  padding: .75rem 0 2rem;
+  border-bottom: 1px solid var(--color-edge);
 }
-.kicker {
-  margin: 0 0 1rem; display: flex; align-items: center; gap: .65rem; flex-wrap: wrap;
-  color: var(--color-meta); font-size: .75rem; letter-spacing: .02em;
+.series-label {
+  margin: 0 0 1.05rem; color: var(--color-muted); font-size: .75rem;
+  font-weight: 500; letter-spacing: .2em; text-transform: uppercase;
 }
-.kicker .room { color: var(--color-accent); font-weight: 600; }
-.kicker .issue {
-  padding-left: .65rem; border-left: 1px solid var(--color-edge);
-  color: var(--color-dark); font-size: .75rem; font-weight: 600;
-  font-variant-numeric: tabular-nums;
-}
-.kicker .period { font-variant-numeric: tabular-nums; }
 h1 {
-  margin: 0 0 1rem; max-width: 50rem;
-  font-size: clamp(1.9rem, 3.5vw, 2.75rem); font-weight: 600;
+  margin: 0; max-width: 42rem;
+  font-size: clamp(1.9rem, 3vw, 2.25rem); font-weight: 600;
   line-height: 1.14; letter-spacing: -.04em; text-wrap: balance;
 }
 .intro {
-  margin: 0 0 1.25rem; max-width: 44rem;
-  color: var(--color-sub); font-size: 1rem; font-weight: 300;
+  margin: 1.1rem 0 0; max-width: 42rem;
+  color: var(--color-sub); font-size: 1.0625rem; font-weight: 300;
   line-height: 1.75; letter-spacing: -.02em;
 }
+.publication-meta {
+  margin-top: 1.25rem; display: flex; align-items: center; gap: .7rem;
+  color: var(--color-meta); font-size: .8125rem; font-variant-numeric: tabular-nums;
+}
+.publication-meta strong { color: var(--color-dark); font-weight: 600; }
+.community-mark {
+  width: 2.125rem; height: 2.125rem; flex: 0 0 2.125rem;
+  display: grid; place-items: center; border-radius: 50%;
+  color: var(--color-accent); background: var(--color-accent-soft);
+}
+.community-mark svg { width: 1rem; height: 1rem; }
 .status {
-  margin: 0; display: flex; align-items: center; gap: .5rem; flex-wrap: wrap;
+  margin: 1rem 0 0; display: flex; align-items: center; gap: .5rem; flex-wrap: wrap;
   color: var(--color-meta); font-size: .75rem;
 }
 .status-note { margin-left: .15rem; }
@@ -557,9 +755,9 @@ h1 {
 }
 .badge-quiet { background: transparent; color: var(--color-meta); }
 .stats {
-  margin: 2rem 0 0; padding: .9rem 0;
+  margin: 1.75rem 0 0; padding: .9rem 0 0;
   display: grid; grid-template-columns: repeat(auto-fit, minmax(7rem, 1fr));
-  border-top: 1px solid var(--color-edge); border-bottom: 1px solid var(--color-edge);
+  border-top: 1px solid var(--color-edge);
 }
 .stats-5 .stat:last-child { grid-column: auto; min-height: auto; }
 .stat {
@@ -578,10 +776,10 @@ h1 {
 
 .section-index {
   position: sticky; top: 3.5rem; z-index: 30;
-  margin: 0 0 1rem; padding: .75rem 0;
+  margin: 0 0 1rem; padding: .6rem 0;
   display: flex; gap: .5rem; overflow-x: auto; scrollbar-width: none;
   border-top: 1px solid var(--color-edge); border-bottom: 1px solid var(--color-edge);
-  background: color-mix(in srgb, var(--color-paper) 94%, transparent);
+  background: color-mix(in srgb, var(--color-white) 94%, transparent);
   -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
 }
 .section-index::-webkit-scrollbar { display: none; }
@@ -596,17 +794,16 @@ h1 {
 }
 .section-index a:hover { background: var(--color-paper-dark); color: var(--color-dark); }
 
-/* 섹션: 왼쪽 설명 4열 + 오른쪽 콘텐츠 8열. */
+/* 뉴스레터 상세와 같은 42rem 단일 읽기 열. */
 section {
-  display: grid; grid-template-columns: repeat(12, minmax(0, 1fr));
-  column-gap: 2.5rem;
-  padding: clamp(4rem, 7vw, 6.5rem) 0;
+  display: block;
+  padding: clamp(3.5rem, 6vw, 4.75rem) 0;
   border-bottom: 1px solid var(--color-edge);
   scroll-margin-top: 7rem;
 }
 section:last-of-type { border-bottom: none; }
-.sec-head { grid-column: 1 / span 4; align-self: start; }
-.sec-body { grid-column: 5 / -1; min-width: 0; }
+.sec-head { margin-bottom: 1.75rem; }
+.sec-body { min-width: 0; }
 .sec-label {
   margin: 0 0 .7rem; display: flex; align-items: center; gap: .5rem;
   color: var(--color-accent); font-size: .6875rem; font-weight: 600;
@@ -622,7 +819,7 @@ h2 {
   font-size: clamp(1.35rem, 2.8vw, 1.75rem); font-weight: 600;
   line-height: 1.25; letter-spacing: -.03em;
 }
-.sec-desc { margin: 0; max-width: 18rem; color: var(--color-meta); font-size: .875rem; }
+.sec-desc { margin: 0; max-width: 35rem; color: var(--color-meta); font-size: .875rem; }
 .empty {
   margin: 0; padding: 2rem; border: 1px dashed var(--color-edge); border-radius: 1rem;
   background: color-mix(in srgb, var(--color-white) 55%, transparent);
@@ -710,7 +907,7 @@ mark { padding: 0; background: none; color: var(--color-dark); }
   letter-spacing: .14em; text-transform: uppercase;
 }
 .group-count { opacity: .7; letter-spacing: 0; font-variant-numeric: tabular-nums; }
-.tip-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .75rem; }
+.tip-grid { display: grid; grid-template-columns: 1fr; gap: .75rem; }
 .tip-card {
   padding: 1.25rem; border: 1px solid var(--color-edge); border-radius: 1rem;
   display: flex; flex-direction: column; gap: .5rem;
@@ -738,6 +935,10 @@ mark { padding: 0; background: none; color: var(--color-dark); }
   font-size: clamp(1.65rem, 4vw, 2.35rem); letter-spacing: -.035em;
 }
 .cta-lede { margin: 0 0 1.75rem; max-width: 34rem; color: rgba(255,255,255,.78); }
+.openchat-url {
+  display: inline-block; margin: -.85rem 0 1.5rem; color: rgba(255,255,255,.76);
+  font-size: .75rem; overflow-wrap: anywhere; text-decoration: underline;
+}
 .cta-buttons { display: flex; gap: .65rem; flex-wrap: wrap; }
 .btn {
   display: inline-flex; align-items: center; justify-content: center;
@@ -750,8 +951,6 @@ mark { padding: 0; background: none; color: var(--color-dark); }
 .btn:active { transform: none; }
 .btn-primary { background: var(--color-white); color: var(--color-accent); }
 .btn-primary:hover { background: var(--color-paper); }
-.btn-ghost { border-color: rgba(255,255,255,.6); color: var(--color-white); }
-.btn-ghost:hover { background: rgba(255,255,255,.1); }
 
 .colophon {
   margin-top: 4rem; padding-top: 2rem; border-top: 1px solid var(--color-edge);
@@ -771,14 +970,10 @@ mark { padding: 0; background: none; color: var(--color-dark); }
 }
 .pipe dd { margin: 0; color: var(--color-sub); font-size: .8125rem; font-variant-numeric: tabular-nums; }
 
-@media (min-width: 54.01rem) {
-  .sec-head { position: sticky; top: 8rem; }
-}
 @media (max-width: 54rem) {
   .site-chrome-inner { padding: 0 1.5rem; }
   .sheet { padding: 4.75rem 1.5rem 5rem; }
-  section { display: block; padding: 4rem 0; }
-  .sec-head { margin-bottom: 1.75rem; }
+  section { padding: 4rem 0; }
   .sec-desc { max-width: 34rem; }
 }
 @media (max-width: 40rem) {
@@ -821,7 +1016,7 @@ mark { padding: 0; background: none; color: var(--color-dark); }
   .sec-head { position: static; }
   .qa, .tip-card { box-shadow: none; }
   .cta { background: #fff; color: var(--color-dark); border: 1px solid var(--color-edge); }
-  .cta h2, .cta .sec-label, .cta-lede { color: var(--color-dark); }
+  .cta h2, .cta .sec-label, .cta-lede, .cta .openchat-url { color: var(--color-dark); }
   .cta-buttons { display: none; }
 }
 """
@@ -871,6 +1066,8 @@ def main() -> None:
     ap.add_argument("--no-archive", action="store_true", help="보관본을 남기지 않는다")
     ap.add_argument("--fragment", metavar="경로",
                     help="아티팩트 게시용 조각(<title>+<style>+본문)을 이 경로에 함께 쓴다")
+    ap.add_argument("--email-preview", metavar="경로",
+                    help="같은 전체 데이터를 640px 뉴스레터 이메일 검토본으로 함께 쓴다(발송 아님)")
     args = ap.parse_args()
 
     data = json.loads(Path(args.final).read_text(encoding="utf-8"))
@@ -894,7 +1091,7 @@ def main() -> None:
     n_nick = len(set(re.findall(r"(?:함께한 선생님|참여자)[A-Z]+", dumped)))
 
     start_iso, end_iso = data_range(source_period_id or data["period_id"], since, until)
-    week_label = f"{_display(start_iso)} ~ {_display(end_iso)}"
+    week_label = display_period(start_iso, end_iso)
     issue = args.issue or issue_number(data["period_id"])
     content = render(data, week_label, issue)
     title = f"{room_name()} 주간 리포트"
@@ -942,6 +1139,14 @@ def main() -> None:
         frag.parent.mkdir(parents=True, exist_ok=True)
         frag.write_text(to_fragment(out_html), encoding="utf-8")
         written.append(frag)
+
+    if args.email_preview:
+        email_target = Path(args.email_preview)
+        email_target.parent.mkdir(parents=True, exist_ok=True)
+        email_target.write_text(
+            render_email_document(data, week_label, issue), encoding="utf-8"
+        )
+        written.append(email_target)
 
     print(f"[render] {issue}호 ({size/1024:.0f} KB, 글꼴 {len(font_b64)/1024:.0f} KB)")
     for w in written:

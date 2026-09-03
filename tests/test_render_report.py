@@ -14,7 +14,7 @@ SPEC.loader.exec_module(render_report)
 
 
 def build_html(data: dict) -> str:
-    content = render_report.render(data, "2026.08.19 ~ 2026.08.26", 1)
+    content = render_report.render(data, "2026.08.19 - 08.26", 1)
     return render_report.TEMPLATE.format(
         title="노션하는 교사톡 주간 리포트",
         font_css="",
@@ -29,6 +29,10 @@ def build_html(data: dict) -> str:
         n_esc=0,
         n_nick=0,
     )
+
+
+def build_email(data: dict) -> str:
+    return render_report.render_email_document(data, "2026.08.19 - 08.26", 1)
 
 
 class ReportDocumentTest(unittest.TestCase):
@@ -68,6 +72,24 @@ class ReportDocumentTest(unittest.TestCase):
         self.assertIn("운영자 검토 전", self.html)
         self.assertIn("리포트는 자동 발행되지 않습니다", self.html)
 
+    def test_period_uses_hyphen_not_tilde_or_long_dash(self):
+        self.assertEqual(
+            render_report.display_period("2026-08-19", "2026-08-26"),
+            "2026.08.19 - 08.26",
+        )
+        self.assertEqual(
+            render_report.display_period("2026-12-29", "2027-01-04"),
+            "2026.12.29 - 2027.01.04",
+        )
+        self.assertNotIn("2026.08.19 ~ 2026.08.26", self.html)
+        self.assertNotIn("2026.08.19—08.26", self.html)
+
+    def test_period_id_is_used_when_draft_and_message_db_are_absent(self):
+        self.assertEqual(
+            render_report.data_range("20260819_20260826", None, None),
+            ("2026-08-19", "2026-08-26"),
+        )
+
     def test_notiontalk_navigation_targets_canonical_community(self):
         self.assertIn(render_report.COMMUNITY_URL, self.html)
         self.assertNotIn('href="https://www.notiontalk.com/community/', self.html)
@@ -100,6 +122,59 @@ class ReportDocumentTest(unittest.TestCase):
         for text in ("보기 구성", "아직 답이 없는 질문", "질문", "팁 제목", "할 일"):
             self.assertIn(text, page)
 
+    def test_fixed_openchat_cta_exposes_exact_url(self):
+        self.assertIn("이 인사이트는 노션하는 교사톡에서 시작됐습니다", self.html)
+        self.assertIn("노션하는 교사톡 참여하기", self.html)
+        self.assertGreaterEqual(self.html.count(render_report.OPENCHAT_URL), 2)
+        self.assertIn('class="openchat-url"', self.html)
+
+    def test_email_preview_renders_every_item_without_truncation(self):
+        data = {
+            "period_id": "20260819_20260826",
+            "report": {
+                "hook_title": "한 주의 기록",
+                "intro": "질문과 답을 모았습니다.",
+                "sections": {
+                    "stats": {"메시지": 323},
+                    "topics": [
+                        {"topic": f"주제 {i}", "why": f"근거 {i}"}
+                        for i in range(1, 6)
+                    ],
+                    "unresolved": [
+                        {"question": f"미해결 {i}"} for i in range(1, 4)
+                    ],
+                },
+            },
+            "faq": [
+                {"question": f"질문 {i}", "answer": f"답 {i}", "practical_tip": f"실무 팁 {i}"}
+                for i in range(1, 14)
+            ],
+            "tips": [
+                {"title": f"팁 제목 {i}", "body": f"팁 본문 {i}", "feature_tags": ["AI"]}
+                for i in range(1, 27)
+            ],
+            "actions": [
+                {"text": f"할 일 {i}", "owner_nickname": "함께한 선생님A"}
+                for i in range(1, 4)
+            ],
+        }
+        email = build_email(data)
+        self.assertTrue(email.startswith("<!doctype html>"))
+        self.assertIn("max-width:640px", email)
+        self.assertIn("검토용 이메일 미리보기", email)
+        self.assertIn("자동 발송되지 않습니다", email)
+        for text in (
+            "주제 5",
+            "질문 13",
+            "실무 팁 13",
+            "미해결 3",
+            "팁 제목 26",
+            "팁 본문 26",
+            "할 일 3",
+        ):
+            self.assertIn(text, email)
+        self.assertGreaterEqual(email.count(render_report.OPENCHAT_URL), 2)
+
 
 class BrandContractTest(unittest.TestCase):
     def test_inherits_notiontalk_brand_tokens(self):
@@ -126,10 +201,17 @@ class BrandContractTest(unittest.TestCase):
         self.assertIn("@media print", render_report.CSS)
 
     def test_issue_header_uses_compact_editorial_hierarchy(self):
-        self.assertIn("font-size: clamp(1.9rem, 3.5vw, 2.75rem)", render_report.CSS)
+        self.assertIn("max-width: 42rem", render_report.CSS)
+        self.assertIn("font-size: clamp(1.9rem, 3vw, 2.25rem)", render_report.CSS)
         self.assertNotIn("4.35rem", render_report.CSS)
         self.assertIn("grid-template-columns: repeat(auto-fit, minmax(7rem, 1fr))", render_report.CSS)
         self.assertIn("border-top: 1px solid var(--color-edge)", render_report.CSS)
+
+    def test_web_report_uses_newsletter_single_column(self):
+        self.assertIn(".masthead, .section-index, .sheet > section, .colophon { max-width: 42rem; }", render_report.CSS)
+        self.assertIn("/* 뉴스레터 상세와 같은 42rem 단일 읽기 열. */", render_report.CSS)
+        self.assertIn(".tip-grid { display: grid; grid-template-columns: 1fr;", render_report.CSS)
+        self.assertNotIn("grid-template-columns: repeat(12, minmax(0, 1fr))", render_report.CSS)
 
 
 if __name__ == "__main__":

@@ -122,10 +122,13 @@ python3 .claude/skills/pii-guard/scripts/apply.py output/insights/period_<id>.pa
     --final output/insights/period_<id>.final.json \
     --draft output/insights/period_<id>.draft.json \
     --eval  output/insights/period_<id>.eval.json \
-    --font  <Pretendard woff2 경로>
+    --font  <Pretendard woff2 경로> \
+    --email-preview output/reports/1호_email-preview.html
 ```
 
 `--dry-run`을 붙이면 LLM을 부르지 않고 프롬프트만 확인할 수 있습니다.
+`--email-preview`는 발송하지 않고 같은 전체 내용을 640px 뉴스레터 규격 HTML로
+추가 생성합니다. 웹·이메일 검토본 모두 사람 승인 전 산출물입니다.
 
 ---
 
