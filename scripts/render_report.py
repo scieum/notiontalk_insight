@@ -220,6 +220,71 @@ def _section(sid: str, label: str, ko: str, desc: str, inner: str, count=None) -
 </section>"""
 
 
+_TITLE_DATE_RE = re.compile(r"\s*\(\s*\d{4}-\d{2}-\d{2}\s*~\s*\d{4}-\d{2}-\d{2}\s*\)\s*$")
+
+
+def legacy_eval_counts(ev: dict) -> dict:
+    """counts 블록이 없는 V1 eval.json에서 항목별 verdict를 세어 같은 모양으로 돌려준다."""
+    counts = {"pass": 0, "discard": 0, "escalate": 0}
+    items = [ev.get("report") or {}]
+    for key in ("faq", "tips", "actions"):
+        items.extend(ev.get(key) or [])
+    for it in items:
+        v = (it or {}).get("verdict")
+        if v in counts:
+            counts[v] += 1
+    return counts
+
+
+# V1 stats 키 -> 2호부터 쓰는 화면 라벨. 순서가 곧 화면 순서다.
+_V1_STAT_LABELS = {
+    "total_messages": "메시지 수",
+    "unique_active_participants": "함께한 선생님",
+    "total_threads": "스레드 수",
+}
+
+
+def normalize_legacy(data: dict) -> dict:
+    """1호(2026-08-24_A) 시절의 V1 final.json을 현재 렌더러가 읽는 모양으로 맞춘다.
+
+    V1과 지금의 차이는 셋이다: (1) sections.topics/unresolved가 dict가 아니라 문자열
+    목록, (2) hook_title/intro가 없고 title만 있음, (3) 그 title 끝에 기간이 괄호로
+    붙어 있음(머리말 kicker와 중복). 확정된 산출물은 재생성하지 않고 파생시킨다(C9)는
+    원칙대로 값을 새로 만들지 않고 모양만 바꾼다 — why/intro는 빈 문자열로 둔다.
+    입력을 바꾸지 않고 얕은 복사본을 돌려준다.
+    """
+    report = dict(data.get("report") or {})
+    sections = dict(report.get("sections") or {})
+    sections["topics"] = [
+        t if isinstance(t, dict) else {"topic": str(t), "why": ""}
+        for t in (sections.get("topics") or [])
+    ]
+    sections["unresolved"] = [
+        u if isinstance(u, dict) else {"question": str(u)}
+        for u in (sections.get("unresolved") or [])
+    ]
+    stats = sections.get("stats") or {}
+    if any(k in stats for k in _V1_STAT_LABELS):
+        # V1 stats는 영문 키(total_messages 등)라 화면에 그대로 찍히면 안 된다. 2호부터
+        # 쓰는 한글 라벨·순서로 옮기고, 화면에 없는 키(system_only_threads, period_*)는
+        # 버린다. 질문 수·해결 수는 V1이 따로 주지 않으므로 resolved/unresolved 목록
+        # 길이에서 파생한다(새 값을 만드는 게 아니라 확정본을 세는 것이다).
+        mapped = {ko: stats[en] for en, ko in _V1_STAT_LABELS.items() if en in stats}
+        n_res = len(sections.get("resolved") or [])
+        n_unres = len(sections.get("unresolved") or [])
+        if n_res or n_unres:
+            mapped["질문 수"] = n_res + n_unres
+            mapped["그중 해결된 수"] = n_res
+        sections["stats"] = mapped
+    report["sections"] = sections
+    if not report.get("hook_title") and report.get("title"):
+        report["hook_title"] = _TITLE_DATE_RE.sub("", str(report["title"])).strip()
+    report.setdefault("intro", "")
+    out = dict(data)
+    out["report"] = report
+    return out
+
+
 def render_body(data: dict) -> str:
     report = data.get("report") or {}
     sections = report.get("sections") or {}
@@ -328,6 +393,7 @@ def _to_week(text: str) -> str:
 
 
 def render(data: dict, week_label: str, issue: int) -> str:
+    data = normalize_legacy(data)
     report = data.get("report") or {}
     stats = (report.get("sections") or {}).get("stats") or {}
 
@@ -337,6 +403,9 @@ def render(data: dict, week_label: str, issue: int) -> str:
         for k, v in stats.items()
     )
     stats_class = f"stats stats-{min(len(stats), 6)}"
+    # 1호(V1 스키마)에는 intro가 없다. 빈 <p>를 남기면 머리말에 공백 줄이 생긴다.
+    intro_text = report.get("intro") or ""
+    intro = f'<p class="intro">{esc(_to_week(intro_text))}</p>' if intro_text else ""
 
     head = f"""<header class="masthead">
   <p class="kicker">
@@ -345,7 +414,7 @@ def render(data: dict, week_label: str, issue: int) -> str:
     <span class="period">{esc(week_label)}</span>
   </p>
   <h1>{esc(_to_week(report.get('hook_title', '')))}</h1>
-  <p class="intro">{esc(_to_week(report.get('intro', '')))}</p>
+  {intro}
   <p class="status"><span class="badge">초안</span>
      <span class="badge badge-quiet">자동생성</span>
      <span class="status-note">운영자 검토 전이며, 이 상태로는 발행되지 않습니다.</span></p>
@@ -420,7 +489,7 @@ TEMPLATE = """<!doctype html>
   <p class="cline">이 리포트는 카카오톡 오픈채팅 대화에서 자동으로 추출·검증·익명화되었습니다.
      닉네임은 가명으로 바뀌었고, 연락처·이메일 등은 마스킹되었습니다.</p>
   <dl class="pipe">
-    <div><dt>추출</dt><dd>스레드 {n_threads}개 · 분류 {n_batches}회</dd></div>
+    <div><dt>추출</dt><dd>{extract_line}</dd></div>
     <div><dt>검증</dt><dd>통과 {n_pass} · 폐기 {n_discard} · 공개보류 {n_esc}</dd></div>
     <div><dt>익명화</dt><dd>가명 {n_nick}명 (anon 모드)</dd></div>
   </dl>
@@ -888,10 +957,16 @@ def main() -> None:
         g = d.get("generation") or {}
         n_batches, n_threads = g.get("batches", 0), g.get("threads_selected", 0)
     if args.eval_path:
-        counts.update(json.loads(Path(args.eval_path).read_text(encoding="utf-8")).get("counts") or {})
+        ev = json.loads(Path(args.eval_path).read_text(encoding="utf-8"))
+        counts.update(ev.get("counts") or legacy_eval_counts(ev))
 
     dumped = json.dumps(data, ensure_ascii=False)
     n_nick = len(set(re.findall(r"(?:함께한 선생님|참여자)[A-Z]+", dumped)))
+    if not n_threads:
+        # V1 draft에는 generation 통계가 없다. 리포트가 실제로 인용한 스레드 수로 대신한다.
+        n_threads = len((data.get("report") or {}).get("source_thread_ids") or [])
+    # 분류 횟수를 모르는 호(V1)에서 "분류 0회"라고 찍으면 거짓 통계가 된다. 아는 것만 적는다.
+    extract_line = f"스레드 {n_threads}개" + (f" · 분류 {n_batches}회" if n_batches else "")
 
     start_iso, end_iso = data_range(source_period_id or data["period_id"], since, until)
     week_label = f"{_display(start_iso)} ~ {_display(end_iso)}"
@@ -904,8 +979,7 @@ def main() -> None:
         "content": content,
         "homepage_url": HOMEPAGE_URL,
         "community_url": COMMUNITY_URL,
-        "n_batches": n_batches,
-        "n_threads": n_threads,
+        "extract_line": extract_line,
         "n_pass": counts.get("pass", 0),
         "n_discard": counts.get("discard", 0),
         "n_esc": counts.get("escalate", 0),
