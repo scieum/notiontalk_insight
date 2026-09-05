@@ -178,9 +178,14 @@ Gemini 단일 구성입니다. 생성과 평가에 **다른 모델**을 씁니�
 
 | 용도 | 모델 |
 |------|------|
-| 생성 (A4) | `gemini-2.5-flash` |
-| 평가 (A5) | `gemini-3.5-flash` |
-| 임베딩 | `gemini-embedding-001` (3072차원) |
+| 생성 (A4) | `claude-sonnet-5` (`claude -p`) — Gemini 폴백: `gemini-2.5-flash` |
+| 평가 (A5) | `claude-opus-5` (`claude -p`) — Gemini 폴백: `gemini-3.5-flash` |
+| 임베딩 | `gemini-embedding-001` (3072차원) — KB 미구현이라 아직 안 씀 |
+
+**2026-09-05부터 기본 백엔드는 Claude Code CLI**입니다. 이 Mac에 로그인된 `claude`를
+`claude -p --output-format json --tools ""`로 헤드리스 호출하므로 API 키가 필요 없고
+무료 등급 할당량 문제가 없습니다(그날 Gemini 20요청/일 한도가 바닥나 A5 재생성이 전부
+실패한 것이 전환 계기). Gemini로 되돌리려면 `TALKINSIGHT_LLM_PROVIDER=gemini`.
 
 무료 등급은 **모델당 하루 20요청**입니다. A4 한 사이클이 9회 정도이니 여유롭지
 않습니다. 배치 결과는 캐시되므로 중간에 끊긴 실행을 다시 돌려도 재과금되지 않습니다.

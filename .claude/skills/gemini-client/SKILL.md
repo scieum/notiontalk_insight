@@ -5,6 +5,13 @@ description: Gemini LLM·임베딩 호출을 위한 공용 래퍼(재시도, 토
 
 # gemini-client (공용 LLM 호출 래퍼)
 
+> **[2026-09-05] 기본 백엔드가 Claude Code CLI로 바뀌었다.** `llm.py`의 `generate()`/
+> `evaluate()`는 이제 `claude -p --output-format json --tools ""`를 서브프로세스로
+> 부른다(생성 `claude-sonnet-5`, 평가 `claude-opus-5`). API 키 없음, 할당량 문제 없음.
+> 프로젝트 밖 빈 디렉터리(`~/Library/Application Support/talkinsight/llm-cwd`)를 cwd로
+> 써서 이 저장소의 CLAUDE.md가 프롬프트에 섞이지 않게 한다. Gemini 경로는
+> `TALKINSIGHT_LLM_PROVIDER=gemini`로 남아 있다. 폴더 이름은 역사적 이유로 유지.
+>
 > 상태: **부분 구현**. 재시도(`retry.py`)·예산(`budget.py`)·키 조회(`auth.py`)는
 > 단위 테스트로 검증 완료.
 >
