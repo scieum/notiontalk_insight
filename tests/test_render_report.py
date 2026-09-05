@@ -22,8 +22,7 @@ def build_html(data: dict) -> str:
         content=content,
         homepage_url=render_report.HOMEPAGE_URL,
         community_url=render_report.COMMUNITY_URL,
-        n_batches=0,
-        n_threads=0,
+        extract_line="스레드 0개",
         n_pass=0,
         n_discard=0,
         n_esc=0,
@@ -99,6 +98,55 @@ class ReportDocumentTest(unittest.TestCase):
         self.assertIn('<dt class="lbl">메시지</dt><dd class="num">323</dd>', page)
         for text in ("보기 구성", "아직 답이 없는 질문", "질문", "팁 제목", "할 일"):
             self.assertIn(text, page)
+
+    def test_renders_v1_schema_from_first_issue(self):
+        # 1호(2026-08-24_A) final.json: topics/unresolved가 문자열, hook_title 대신 title(+기간).
+        data = {
+            "period_id": "2026-08-24_A",
+            "report": {
+                "title": "노션하는 교사톡 주간 리포트 (2026-08-24 ~ 2026-08-30)",
+                "sections": {
+                    "topics": ["노션 AI노트 안정성", "워크스페이스 이관"],
+                    "resolved": ["연수 구성 방법"],
+                    "unresolved": ["할인 프로모션 진행 여부"],
+                    "stats": {
+                        "total_threads": 145,
+                        "system_only_threads": 102,
+                        "total_messages": 317,
+                        "unique_active_participants": 22,
+                        "period_start": "2026-08-24",
+                    },
+                },
+                "source_thread_ids": ["T1", "T2"],
+            },
+            "faq": [{"question": "질문", "answer": "답"}],
+            "tips": [{"title": "팁 제목", "body": "팁 본문", "feature_tags": ["AI"]}],
+            "actions": [{"text": "할 일", "owner_nickname": "참여자A"}],
+        }
+        page = build_html(data)
+        self.assertIn("<h1>노션하는 교사톡 주간 리포트</h1>", page)
+        self.assertNotIn("2026-08-24 ~ 2026-08-30", page)
+        self.assertNotIn('class="intro"', page)
+        self.assertIn('<dt class="lbl">메시지 수</dt><dd class="num">317</dd>', page)
+        self.assertIn('<dt class="lbl">스레드 수</dt><dd class="num">145</dd>', page)
+        self.assertIn('<dt class="lbl">질문 수</dt><dd class="num">2</dd>', page)
+        self.assertIn('<dt class="lbl">그중 해결된 수</dt><dd class="num">1</dd>', page)
+        for raw in ("total_threads", "system_only_threads", "period_start"):
+            self.assertNotIn(raw, page)
+        for text in ("노션 AI노트 안정성", "워크스페이스 이관", "할인 프로모션 진행 여부"):
+            self.assertIn(text, page)
+        self.assertEqual(data["report"]["sections"]["topics"][0], "노션 AI노트 안정성")  # 입력 불변
+
+    def test_legacy_eval_counts_sums_item_verdicts(self):
+        ev = {
+            "report": {"verdict": "pass"},
+            "faq": [{"verdict": "pass"}, {"verdict": "discard"}],
+            "tips": [{"verdict": "escalate"}],
+            "actions": [],
+        }
+        self.assertEqual(
+            render_report.legacy_eval_counts(ev), {"pass": 2, "discard": 1, "escalate": 1}
+        )
 
 
 class BrandContractTest(unittest.TestCase):
