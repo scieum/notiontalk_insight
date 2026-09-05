@@ -1,13 +1,19 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <!--
-  파이프라인 A 전체 (A0~A8) 실행 — 설계서 §4.6.
-  주기: 월/목 09:00. 완료 기준(설계서 §5 V6)이 충족되기 전까지는 launchctl load 하지 않는다.
+  파이프라인 A (A0'~A7) 실행 — 설계서 §4.6. 주기: 월/목 09:00.
 
-  TODO (V6):
-    - 아래 /ABSOLUTE/PATH/TO/TalkInsight 를 Mac의 실제 프로젝트 경로로 교체
-    - ProgramArguments를 실제 실행 방식(예: `claude -p "..."` 헤드리스 호출 또는
-      전용 Python 오케스트레이터 스크립트)으로 확정 — 아직 미결정, 이 파일은 템플릿
+  설치 (이 Mac, 2026-09-05):
+    cp launchd/com.talkinsight.collect_publish.plist ~/Library/LaunchAgents/
+    launchctl load ~/Library/LaunchAgents/com.talkinsight.collect_publish.plist
+  해제:
+    launchctl unload ~/Library/LaunchAgents/com.talkinsight.collect_publish.plist
+  지금 바로 한 번 돌려보기:
+    launchctl start com.talkinsight.collect_publish
+
+  경로가 OneDrive 아래라 다른 Mac에서는 아래 절대경로 4곳을 바꿔야 한다.
+  인터프리터는 .venv(google-genai, fonttools)를 쓴다 — 시스템 python3로 부르면 A4에서 멈춘다.
+  Mac이 꺼져 있어 놓친 사이클은 다음 실행이 state.json의 last_report_until부터 이어받는다(C3).
 -->
 <plist version="1.0">
 <dict>
@@ -16,15 +22,22 @@
 
     <key>ProgramArguments</key>
     <array>
-        <string>/usr/bin/env</string>
-        <string>python3</string>
-        <string>/ABSOLUTE/PATH/TO/TalkInsight/scripts/run_cycle.py</string>
+        <string>/Users/keemhayun/Library/CloudStorage/OneDrive-한국교원대학교/Claude Code/Notion/notion_talk_kakao/.venv/bin/python</string>
+        <string>/Users/keemhayun/Library/CloudStorage/OneDrive-한국교원대학교/Claude Code/Notion/notion_talk_kakao/scripts/run_cycle.py</string>
         <string>--pipeline</string>
         <string>collect_publish</string>
     </array>
 
     <key>WorkingDirectory</key>
-    <string>/ABSOLUTE/PATH/TO/TalkInsight</string>
+    <string>/Users/keemhayun/Library/CloudStorage/OneDrive-한국교원대학교/Claude Code/Notion/notion_talk_kakao</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+        <key>LANG</key>
+        <string>ko_KR.UTF-8</string>
+    </dict>
 
     <key>StartCalendarInterval</key>
     <array>
@@ -47,8 +60,8 @@
     </array>
 
     <key>StandardOutPath</key>
-    <string>/ABSOLUTE/PATH/TO/TalkInsight/output/logs/launchd_collect_publish.out.log</string>
+    <string>/Users/keemhayun/Library/CloudStorage/OneDrive-한국교원대학교/Claude Code/Notion/notion_talk_kakao/output/logs/launchd_collect_publish.out.log</string>
     <key>StandardErrorPath</key>
-    <string>/ABSOLUTE/PATH/TO/TalkInsight/output/logs/launchd_collect_publish.err.log</string>
+    <string>/Users/keemhayun/Library/CloudStorage/OneDrive-한국교원대학교/Claude Code/Notion/notion_talk_kakao/output/logs/launchd_collect_publish.err.log</string>
 </dict>
 </plist>

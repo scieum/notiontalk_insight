@@ -455,6 +455,12 @@ def run(
         "duplicate_threshold": DUPLICATE_THRESHOLD,
         "counts": counts,
         "items": results,
+        # 재생성본은 draft.json에 없다 — 여기 내용을 같이 싣지 않으면 apply_verdicts가
+        # 판정만 보고 실을 항목을 찾지 못해 조용히 빠진다(2026-09-05 2호에서 9건 누락).
+        "regenerated_items": {
+            key: [it for kept in regenerated.values() for it, kind in kept if kind == key]
+            for key in ("faq", "tips", "actions")
+        },
     }
     out.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
 

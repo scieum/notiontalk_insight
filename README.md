@@ -58,8 +58,9 @@ B3 질문함폴링(30분) → B4 검색 → B5 답변생성 → B6 검증 → B7
 | A4 인사이트 추출 | **완료** |
 | A5 검증 | **완료** |
 | A6 PII 마스킹·익명화 | **완료** |
-| A7 노션 발행 | 미구현 — 지금은 HTML 렌더러가 검토 화면 역할 |
+| A7 노션 발행 | 구현(PR #2). 노션 토큰 등록 후 실발행 1회 검증 필요. HTML 렌더러가 검토 화면 역할 |
 | A8 / B1~B7 | 미구현 |
+| 오케스트레이션 | **완료** — `scripts/run_cycle.py`가 A0'~A7을 순서대로 부른다. launchd 월/목 09:00 |
 
 각 스킬의 정확한 상태는 `.claude/skills/<이름>/SKILL.md` 맨 위에 적혀 있습니다.
 이 표보다 그쪽을 신뢰하세요.
@@ -126,6 +127,25 @@ python3 .claude/skills/pii-guard/scripts/apply.py output/insights/period_<id>.pa
 ```
 
 `--dry-run`을 붙이면 LLM을 부르지 않고 프롬프트만 확인할 수 있습니다.
+
+### 매주 운영 (자동 사이클)
+
+위 명령을 손으로 치는 대신 `scripts/run_cycle.py`가 전부 이어서 돌립니다.
+
+```bash
+.venv/bin/python scripts/run_cycle.py --pipeline collect_publish
+```
+
+1. 카카오톡 → 채팅방 설정 → 대화 내용 관리 → **텍스트 파일로 저장** → 받은 CSV를 `inbox/raw/`에 넣습니다.
+   (아직 이 한 단계는 사람이 합니다. A0/A0' 자동화가 검증되면 사라집니다.)
+2. 월/목 09:00에 launchd가 `run_cycle.py`를 부릅니다. 새 파일이 없으면 macOS 알림만 띄우고 끝납니다.
+3. 새 파일이 있으면 A1~A6 → `output/reports/<N>호_….html` 검토본을 만들고, 노션 토큰이 있으면
+   노션 DB에 **초안**으로도 올립니다. 리포트를 자동으로 발행 상태로 바꾸지는 않습니다(C5).
+4. 검토 후 노션에서 상태를 직접 바꿉니다. 반려했다면 그 사유를 `output/state.json`의
+   `rejections`에 적어 두면 다음 호 프롬프트에 주입됩니다.
+
+사이클 상태(지난 호가 다룬 마지막 시각, 호수, 처리한 파일)는 `output/state.json`에 있습니다.
+launchd 설치는 `launchd/com.talkinsight.collect_publish.plist` 머리말을 보세요.
 
 ---
 

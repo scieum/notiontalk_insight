@@ -68,6 +68,18 @@ def run(draft_path: Path, eval_path: Path, out_path: Path | None = None) -> dict
                 removed_count[d] = removed_count.get(d, 0) + 1
                 removed_ids.update(item.get("source_message_ids") or [])
 
+    # 재생성본(eval.json의 regenerated_items)은 원본을 대체한 항목이므로 함께 싣는다.
+    # 구버전 eval.json에는 이 키가 없어 내용을 복구할 수 없다 — 그 경우만 경고로 남긴다.
+    regen_items = ev.get("regenerated_items") or {}
+    for key in ("faq", "tips", "actions"):
+        for item in regen_items.get(key) or []:
+            if decision_of.get(item["id"]) in PUBLISHABLE:
+                kept[key].append(item)
+    unrecoverable_ids = [
+        i for i in regenerated_ids
+        if not any(it["id"] == i for key in regen_items for it in regen_items.get(key) or [])
+    ]
+
     # 살아남은 항목이 같은 근거를 쓰고 있으면 그 근거는 '제거됨'이 아니다.
     surviving_ids = {
         mid for key in kept for item in kept[key] for mid in (item.get("source_message_ids") or [])
@@ -97,7 +109,8 @@ def run(draft_path: Path, eval_path: Path, out_path: Path | None = None) -> dict
         "unresolved": draft.get("unresolved") or [],
         "applied": {
             "removed": removed_count,
-            "regenerated_not_in_draft": regenerated_ids,
+            "regenerated_included": len(regenerated_ids) - len(unrecoverable_ids),
+            "regenerated_not_in_draft": unrecoverable_ids,
             "report_entries_dropped": report_dropped,
         },
     }
@@ -132,8 +145,10 @@ def main() -> None:
     print(f"제외      {a['removed']}")
     if a["report_entries_dropped"]:
         print(f"리포트에서 뺀 항목  {a['report_entries_dropped']}")
+    if a["regenerated_included"]:
+        print(f"재생성본 {a['regenerated_included']}건을 원본 대신 실었습니다")
     if a["regenerated_not_in_draft"]:
-        print(f"주의: eval에만 있는 재생성본 {len(a['regenerated_not_in_draft'])}건은 draft에 없어 실리지 않았습니다")
+        print(f"주의: 재생성본 {len(a['regenerated_not_in_draft'])}건은 eval.json에 내용이 없어(구버전) 실리지 않았습니다")
 
 
 if __name__ == "__main__":
