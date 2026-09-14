@@ -188,7 +188,9 @@ def data_range(period_id: str, since: str | None, until: str | None) -> tuple[st
             conn.close()
 
     start = (since or lo or "")[:10]
-    end = (until or hi or lo or since or "")[:10]
+    # until은 '미포함' 경계다. 실제 마지막 메시지 시각(hi)이 있으면 그쪽을 쓴다 —
+    # 안 그러면 09-07~09-14로 돌린 호가 09-13까지만 담고도 09.14로 표기된다.
+    end = (hi or until or lo or since or "")[:10]
     return start, end
 
 
