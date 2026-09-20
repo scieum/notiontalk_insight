@@ -36,6 +36,7 @@ for _stream in (sys.stdout, sys.stderr):
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from lib.common.paths import DOCS_DIR, INSIGHTS_DIR, MESSAGES_DB_PATH, OUTPUT_DIR
+from lib.publication import strict_json_loads, validate_publication
 
 _CODE_RE = re.compile(r"`([^`]+)`")
 _URL_RE = re.compile(r"(https?://[^\s<>`\"']+)")
@@ -427,9 +428,25 @@ TEMPLATE = """<!doctype html>
   <p class="cline quiet">발행 전 사람 검토가 필요합니다. 리포트는 자동 발행되지 않습니다.</p>
 </footer>
 </main>
+{publication_data}
 </body>
 </html>
 """
+
+
+def publication_script(publication: dict | None) -> str:
+    """Embed a validated public projection without changing visible content."""
+    if publication is None:
+        return ""
+    raw = json.dumps(publication, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    safe = (
+        raw.replace("&", "\\u0026")
+        .replace("<", "\\u003c")
+        .replace(">", "\\u003e")
+        .replace("\u2028", "\\u2028")
+        .replace("\u2029", "\\u2029")
+    )
+    return f'<script id="talkinsight-publication" type="application/json">{safe}</script>'
 
 CSS = """
 /* notiontalk.com/app/globals.css의 브랜드 토큰을 그대로 계승한다. */
@@ -867,6 +884,7 @@ def main() -> None:
     ap.add_argument("--draft", help="추출 통계를 판권에 넣으려면 draft.json 경로")
     ap.add_argument("--font", default=None, help="Pretendard woff2 경로 (가변축 권장)")
     ap.add_argument("--issue", type=int, default=None, help="몇 호인지. 생략하면 자동으로 센다")
+    ap.add_argument("--publication", help="validated publication.json to embed for the newsletter pipeline")
     ap.add_argument("--out", help="추가로 복사해 둘 경로 (생략 가능). 보관본은 항상 output/reports/에 쌓인다")
     ap.add_argument("--no-archive", action="store_true", help="보관본을 남기지 않는다")
     ap.add_argument("--fragment", metavar="경로",
@@ -896,6 +914,10 @@ def main() -> None:
     start_iso, end_iso = data_range(source_period_id or data["period_id"], since, until)
     week_label = f"{_display(start_iso)} ~ {_display(end_iso)}"
     issue = args.issue or issue_number(data["period_id"])
+    publication = None
+    if args.publication:
+        publication = strict_json_loads(Path(args.publication).read_text(encoding="utf-8"))
+        validate_publication(publication)
     content = render(data, week_label, issue)
     title = f"{room_name()} 주간 리포트"
     template_args = {
@@ -910,6 +932,7 @@ def main() -> None:
         "n_discard": counts.get("discard", 0),
         "n_esc": counts.get("escalate", 0),
         "n_nick": n_nick,
+        "publication_data": publication_script(publication),
     }
 
     font_b64 = ""

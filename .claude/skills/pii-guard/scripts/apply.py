@@ -14,10 +14,12 @@ PII나 (anon 모드) 원본 닉네임이 남아 있으면 그 항목만 최종 �
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import re
 import sqlite3
 import sys
+from datetime import date
 from pathlib import Path
 
 for _stream in (sys.stdout, sys.stderr):
@@ -38,6 +40,17 @@ from lib.common.paths import DOCS_DIR, INSIGHTS_DIR, MESSAGES_DB_PATH
 
 _ADMIN_SECTION_RE = re.compile(r"^##\s*운영진 닉네임\s*$(.*?)(?=^##\s|\Z)", re.M | re.S)
 _TABLE_ROW_RE = re.compile(r"^\|\s*([^|]+?)\s*\|\s*([^|]*?)\s*\|\s*$", re.M)
+
+
+def _canonical_sha256(value) -> str:
+    encoded = json.dumps(
+        value,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+        allow_nan=False,
+    ).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
 
 
 def load_exempt_nicknames(path: Path | None = None) -> set[str]:
@@ -95,6 +108,43 @@ def get_period_nicknames(
     return ordered
 
 
+def resolve_period_bounds(
+    period_id: str,
+    db_path: Path = MESSAGES_DB_PATH,
+    since: str | None = None,
+    until: str | None = None,
+) -> tuple[str, str]:
+    """Bind A6 evidence to the requested slice, filling open bounds from its DB rows."""
+    lo = hi = None
+    if Path(db_path).exists():
+        conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
+        try:
+            sql = "SELECT MIN(ts), MAX(ts) FROM messages WHERE period_id = ?"
+            params: list = [period_id]
+            if since:
+                sql += " AND ts >= ?"
+                params.append(since)
+            if until:
+                sql += " AND ts < ?"
+                params.append(until)
+            lo, hi = conn.execute(sql, params).fetchone()
+        finally:
+            conn.close()
+
+    start_raw = since or lo
+    end_raw = until or hi
+    if not isinstance(start_raw, str) or not isinstance(end_raw, str):
+        raise ValueError("A6 period bounds require since/until or matching message rows")
+    try:
+        start = date.fromisoformat(start_raw[:10])
+        end = date.fromisoformat(end_raw[:10])
+    except ValueError as exc:
+        raise ValueError("A6 period bounds must begin with YYYY-MM-DD") from exc
+    if start > end:
+        raise ValueError("A6 period start must not be after period end")
+    return start.isoformat(), end.isoformat()
+
+
 def _transform_strings(obj, fn):
     if isinstance(obj, str):
         return fn(obj)
@@ -132,7 +182,8 @@ def verify_item(item, nickname_map: dict[str, str], mode: str) -> list[str]:
 
 
 def run(input_path: Path, output_path: Path | None = None) -> dict:
-    data = json.loads(input_path.read_text(encoding="utf-8"))
+    input_bytes = input_path.read_bytes()
+    data = json.loads(input_bytes.decode("utf-8"))
     period_id = data["period_id"]
     mode = get_consent_mode()
 
@@ -141,6 +192,15 @@ def run(input_path: Path, output_path: Path | None = None) -> dict:
     # 조회하면 빈 목록이 돌아온다 — 그러면 치환할 대상이 없어 재검사도 통과해버려
     # **실명이 그대로 발행된다**(2026-08-26에 실제로 발생).
     lookup_period_id = data.get("source_period_id") or period_id
+    try:
+        period_start, period_end = resolve_period_bounds(
+            lookup_period_id, since=data.get("since"), until=data.get("until")
+        )
+    except (sqlite3.DatabaseError, ValueError) as exc:
+        reason = f"A6 기간 경계를 확정할 수 없습니다: {exc}"
+        escalate("A6", reason, files=[str(input_path)], period_id=period_id)
+        log_event("A6", "failure", period_id=period_id, detail=reason)
+        raise SystemExit(f"[apply] 중단 — {reason}") from exc
     exempt = load_exempt_nicknames()
     nicknames = [
         n for n in get_period_nicknames(
@@ -164,7 +224,15 @@ def run(input_path: Path, output_path: Path | None = None) -> dict:
     # 별칭 생성 결과가 운영진 이름과 겹칠 수 있으니 한 번 더 걸러낸다.
     nickname_map = {k: v for k, v in nickname_map.items() if k not in exempt}
 
-    result = {"period_id": period_id, "report": None, "faq": [], "tips": [], "actions": []}
+    result = {
+        "period_id": period_id,
+        "period_start": period_start,
+        "period_end": period_end,
+        "report": None,
+        "faq": [],
+        "tips": [],
+        "actions": [],
+    }
     dropped: list[tuple[str, str, list[str]]] = []
 
     if data.get("report"):
@@ -179,11 +247,30 @@ def run(input_path: Path, output_path: Path | None = None) -> dict:
         for item in data.get(kind, []):
             processed = process_item(item, nickname_map, mode)
             issues = verify_item(processed, nickname_map, mode)
+            if kind == "actions" and mode == "anon":
+                owner = processed.get("owner_nickname") if isinstance(processed, dict) else None
+                if owner is not None and not re.fullmatch(r"함께한 선생님[A-Z]+", owner):
+                    issues.append("익명 action owner가 승인된 가명 형식이 아님")
             item_id = item.get("id") or "?"
             if issues:
                 dropped.append((kind, item_id, issues))
             else:
                 result[kind].append(processed)
+
+    # Bind the privacy claims to this exact A6 output.  Downstream publication
+    # projection must verify this digest and the applied mode; reading the
+    # current consent config alone cannot prove what A6 actually processed.
+    result["privacy_evidence"] = {
+        "evidence_version": 1,
+        "stage": "A6",
+        "consent_mode": mode,
+        "pii_scan_passed": True,
+        "nickname_policy_passed": True,
+        "source_sha256": hashlib.sha256(input_bytes).hexdigest(),
+        "period_start": period_start,
+        "period_end": period_end,
+        "payload_sha256": _canonical_sha256(result),
+    }
 
     output_path = output_path or (INSIGHTS_DIR / f"period_{period_id}.final.json")
     output_path.parent.mkdir(parents=True, exist_ok=True)

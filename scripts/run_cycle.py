@@ -10,8 +10,8 @@ collect_publish (파이프라인 A):
     A5  검증              — insight-evaluator/evaluate.py + apply_verdicts.py
     A6  PII 마스킹        — pii-guard/apply.py
     렌더                  — render_report.py (검토용 HTML, output/reports/)
-    A7  노션 발행         — notion-publish/publish_report.py. 토큰이 없으면 skip+log.
-                            리포트는 항상 '초안'으로만 올라간다(C5).
+    A7P 공개 projection  — build_publication.py로 검증한 JSON을 HTML에 포함.
+    A7L 기존 Notion 초안 — 명시적 --legacy-notion-draft에서만 실행.
     A8  KB 갱신           — kb-builder 미구현. skip+log.
 
 각 단계는 기존 스킬 스크립트를 **서브프로세스로** 부른다 — 스크립트들은 이미
@@ -75,11 +75,12 @@ SCRIPT = {
     "apply_verdicts": AGENTS / "insight-evaluator/scripts/apply_verdicts.py",
     "pii_apply": SKILLS / "pii-guard/scripts/apply.py",
     "render": ROOT / "scripts/render_report.py",
+    "build_publication": ROOT / "scripts/build_publication.py",
     "publish": SKILLS / "notion-publish/scripts/publish_report.py",
 }
 
 PIPELINE_STAGES = {
-    "collect_publish": ["A0", "A0'", "A1", "A2", "A3", "A4", "A5", "A6", "A7", "A8"],
+    "collect_publish": ["A0", "A0'", "A1", "A2", "A3", "A4", "A5", "A6", "A7P", "A7L", "A8"],
     "kb_refresh": ["B1", "B2"],
     "poll_questions": ["B3", "B4", "B5", "B6", "B7"],
 }
@@ -243,29 +244,55 @@ def collect_publish(args) -> int:
     # A6
     run("A6", SCRIPT["pii_apply"], str(passed))
 
-    # 검토용 HTML
+    # A7P — A6 승인본에서 공개 필드만 projection하고 canonical hash를 검증한다.
+    # 뉴스레터 웹·이메일·Notion 원장의 입력은 이 JSON 하나다.
+    final_data = json.loads(final.read_text(encoding="utf-8"))
+    start_iso = str(final_data.get("period_start") or "")
+    end_iso = str(final_data.get("period_end") or "")
+    if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", start_iso) or not re.fullmatch(
+        r"\d{4}-\d{2}-\d{2}", end_iso
+    ):
+        raise StageFailed("A7P final.json에 검증된 period_start/period_end가 없습니다")
+
     issue = int(state.get("last_issue") or 0) + 1
+    generated_at = datetime.now().astimezone().replace(microsecond=0).isoformat()
+    publication_path = OUTPUT_DIR / "reports" / (
+        f".insight-{start_iso.replace('-', '')}-{end_iso.replace('-', '')}.publication.json"
+    )
+    run(
+        "A7P",
+        SCRIPT["build_publication"],
+        "--final", str(final),
+        "--period-start", start_iso,
+        "--period-end", end_iso,
+        "--issue", str(issue),
+        "--generated-at", generated_at,
+        "--out", str(publication_path),
+    )
+
+    # 검토용 HTML
     render_args = ["--final", str(final), "--draft", str(draft), "--eval", str(evalj),
-                   "--issue", str(issue)]
+                   "--issue", str(issue), "--publication", str(publication_path)]
     if FONT_PATH.exists():
         render_args += ["--font", str(FONT_PATH)]
     out = run("render", SCRIPT["render"], *render_args)
     report_path = next((line.strip()[3:].strip() for line in out.splitlines()
                         if line.strip().startswith("->")), "output/reports/")
 
-    # A7 — 토큰이 있을 때만. 항상 '초안'(C5).
+    # A7L — 예전 TalkInsight 전용 Notion DB 초안 경로. 기본은 끄고,
+    # 뉴스레터 승인 후 newsletter-self-host가 뉴스레터 DB 원장을 멱등 생성한다.
     published = False
-    if args.no_publish:
-        log_event("A7", "skip", detail="--no-publish")
+    if not args.legacy_notion_draft:
+        log_event("A7L", "skip", detail="기존 Notion 초안 경로 비활성(기본)")
     elif not notion_token_present():
-        log_event("A7", "skip", detail="노션 토큰 없음(talkinsight-notion) — HTML 검토본만 생성")
+        log_event("A7L", "skip", detail="노션 토큰 없음(talkinsight-notion)")
     else:
         try:
-            run("A7", SCRIPT["publish"], "--final", str(final), "--draft", str(draft))
+            run("A7L", SCRIPT["publish"], "--final", str(final), "--draft", str(draft))
             published = True
         except StageFailed as e:
             # publish_report.py가 이미 로그·에스컬레이션을 남겼다. 다음 사이클에 재시도.
-            print(f"[A7] 실패 — 다음 사이클에 재시도: {e}")
+            print(f"[A7L] 실패 — 다음 사이클에 재시도: {e}")
 
     log_event("A8", "skip", detail="kb-builder 미구현")
 
@@ -274,10 +301,13 @@ def collect_publish(args) -> int:
     state["last_report_until"] = _slice_end(draft) or datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
     save_state(state)
 
-    where = "노션 초안 + " if published else ""
+    where_parts = ["뉴스레터 투영 데이터 포함 HTML"]
+    if published:
+        where_parts.append("기존 Notion 초안")
     notify("TalkInsight — 리포트 준비됨",
-           f"{issue}호 {where}HTML 검토본이 준비됐습니다. 검토 후 발행해 주세요.")
+           f"{issue}호 HTML 검토본과 {' + '.join(where_parts)}이 준비됐습니다.")
     print(f"\n완료: {issue}호 → {report_path}")
+    print(f"publication: {publication_path.relative_to(ROOT)}")
     return 0
 
 
@@ -320,7 +350,11 @@ def main() -> None:
     ap.add_argument("--period-id", help="이미 병합된 구간을 A4부터 다시 돌린다")
     ap.add_argument("--since", help="A4 슬라이스 시작. 생략하면 state.json의 last_report_until")
     ap.add_argument("--until", help="A4 슬라이스 끝(미포함). 보통 생략")
-    ap.add_argument("--no-publish", action="store_true", help="A7(노션)을 건너뛰고 HTML만 만든다")
+    ap.add_argument(
+        "--legacy-notion-draft",
+        action="store_true",
+        help="기존 TalkInsight 전용 Notion DB 초안 경로를 추가로 실행한다",
+    )
     args = ap.parse_args()
 
     ensure_output_dirs()

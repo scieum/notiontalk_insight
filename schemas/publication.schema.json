@@ -1,0 +1,166 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/scieum/notiontalk_insight/blob/main/schemas/publication.schema.json",
+  "title": "TalkInsight public community insight",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "kind",
+    "content_id",
+    "slug",
+    "issue",
+    "period",
+    "title",
+    "hook_title",
+    "intro",
+    "stats",
+    "topics",
+    "faq",
+    "unresolved",
+    "tips",
+    "actions",
+    "privacy",
+    "generated_at",
+    "content_sha256"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "kind": { "const": "community_insight" },
+    "content_id": {
+      "type": "string",
+      "pattern": "^insight-[0-9]{8}-[0-9]{8}(-r[1-9][0-9]*)?$"
+    },
+    "slug": {
+      "type": "string",
+      "pattern": "^community-insight-[0-9]{3,}(-r[1-9][0-9]*)?$"
+    },
+    "issue": { "type": "integer", "minimum": 1 },
+    "period": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["start", "end", "label"],
+      "properties": {
+        "start": { "type": "string", "format": "date" },
+        "end": { "type": "string", "format": "date" },
+        "label": { "$ref": "#/$defs/nonEmptyString" }
+      }
+    },
+    "title": { "type": "string", "minLength": 1, "maxLength": 120 },
+    "hook_title": { "type": ["string", "null"], "minLength": 1, "maxLength": 120 },
+    "intro": { "type": "string", "minLength": 1, "maxLength": 3000 },
+    "stats": {
+      "type": "object",
+      "maxProperties": 5,
+      "propertyNames": {
+        "enum": ["메시지 수", "함께한 선생님", "스레드 수", "질문 수", "그중 해결된 수"]
+      },
+      "additionalProperties": { "type": "integer", "minimum": 0, "maximum": 10000000 }
+    },
+    "topics": {
+      "type": "array",
+      "maxItems": 10,
+      "items": { "$ref": "#/$defs/topic" }
+    },
+    "faq": {
+      "type": "array",
+      "maxItems": 100,
+      "items": { "$ref": "#/$defs/faq" }
+    },
+    "unresolved": {
+      "type": "array",
+      "maxItems": 100,
+      "items": { "$ref": "#/$defs/unresolved" }
+    },
+    "tips": {
+      "type": "array",
+      "maxItems": 100,
+      "items": { "$ref": "#/$defs/tip" }
+    },
+    "actions": {
+      "type": "array",
+      "maxItems": 100,
+      "items": { "$ref": "#/$defs/action" }
+    },
+    "privacy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["consent_mode", "pii_scan_passed", "source_ids_stripped"],
+      "properties": {
+        "consent_mode": { "enum": ["anon", "named"] },
+        "pii_scan_passed": { "const": true },
+        "source_ids_stripped": { "const": true }
+      }
+    },
+    "generated_at": { "type": "string", "format": "date-time" },
+    "content_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  },
+  "$defs": {
+    "nonEmptyString": { "type": "string", "minLength": 1, "maxLength": 8000 },
+    "nullableString": { "type": ["string", "null"], "maxLength": 8000 },
+    "stringList": {
+      "type": "array",
+      "maxItems": 20,
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1, "maxLength": 80 }
+    },
+    "topic": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["topic", "why"],
+      "properties": {
+        "topic": { "$ref": "#/$defs/nonEmptyString" },
+        "why": { "$ref": "#/$defs/nonEmptyString" }
+      }
+    },
+    "faq": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["question", "answer", "tags", "practical_tip"],
+      "properties": {
+        "question": { "$ref": "#/$defs/nonEmptyString" },
+        "answer": { "$ref": "#/$defs/nonEmptyString" },
+        "tags": { "$ref": "#/$defs/stringList" },
+        "practical_tip": { "$ref": "#/$defs/nullableString" }
+      }
+    },
+    "unresolved": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["question"],
+      "properties": {
+        "question": { "$ref": "#/$defs/nonEmptyString" }
+      }
+    },
+    "tip": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["title", "body", "feature_tags", "practical_tip"],
+      "properties": {
+        "title": { "$ref": "#/$defs/nonEmptyString" },
+        "body": { "$ref": "#/$defs/nonEmptyString" },
+        "feature_tags": { "$ref": "#/$defs/stringList" },
+        "practical_tip": { "$ref": "#/$defs/nullableString" }
+      }
+    },
+    "action": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "text", "owner", "due"],
+      "properties": {
+        "type": { "enum": ["decision", "action"] },
+        "text": { "$ref": "#/$defs/nonEmptyString" },
+        "owner": { "$ref": "#/$defs/nullableString" },
+        "due": {
+          "oneOf": [
+            { "type": "string", "format": "date" },
+            { "type": "null" }
+          ]
+        }
+      }
+    }
+  }
+}

@@ -101,13 +101,16 @@ Pretendard Variable 하나만 사용한다. 독립 HTML에서는 사용 글자�
 
 ## 7. 공개 통합 경계
 
-이 렌더러가 만드는 파일은 언제나 **검토 전 초안**이다. 그대로 공개 경로에 노출하지
-않는다. 공개본은 G-R 검토와 발행 상태를 통과한 별도 산출물이어야 한다.
+이 렌더러가 만드는 파일은 **PR 검토 전 초안**이다. 그대로 공개 경로에 노출하지
+않는다. 사람 검토 후 `main`에 병합된 HTML만 뉴스레터 일일 동기화의 입력이 된다.
+
+HTML 끝에는 A6 allowlist projection을 `application/json`으로 포함한다. 이 데이터는 화면에
+표시되지 않으며, 노션톡 뉴스레터가 정확한 main commit에서 다시 검증한 뒤 사용한다.
 
 notiontalk.com 연결 권장안:
 
-- 목록 정본: `/contents/community/insights/`
-- 호별 정본: `/contents/community/insights/<slug>/`
+- 호별 공개 정본: `/newsletter/letters/<slug>/`
+- 커뮤니 랜딩의 인사이트 카드는 위 뉴스레터 정본으로 연결한다.
 - `/community`는 이미 `/contents/community/`로 308되는 레거시 경로이므로 쓰지 않는다.
 - 새 최상위 메뉴를 더하기보다 커뮤니티 랜딩의 첫 섹션과 이벤트 갤러리 사이에
   `주간 인사이트` 진입 영역을 둔다.

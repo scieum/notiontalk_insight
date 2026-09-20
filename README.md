@@ -92,7 +92,7 @@ B3 질문함폴링(30분) → B4 검색 → B5 답변생성 → B6 검증 → B7
 
 ## 실행
 
-Python 3.9+ (표준 라이브러리만). LLM을 부르는 부분만 `google-genai`가 필요합니다.
+Python 3.10+가 지원 범위입니다(CI는 3.12 고정). LLM을 부르는 부분만 `google-genai`가 필요합니다.
 
 ```bash
 python3 -m venv .venv
@@ -139,13 +139,39 @@ python3 .claude/skills/pii-guard/scripts/apply.py output/insights/period_<id>.pa
 1. 카카오톡 → 채팅방 설정 → 대화 내용 관리 → **텍스트 파일로 저장** → 받은 CSV를 `inbox/raw/`에 넣습니다.
    (아직 이 한 단계는 사람이 합니다. A0/A0' 자동화가 검증되면 사라집니다.)
 2. 월/목 09:00에 launchd가 `run_cycle.py`를 부릅니다. 새 파일이 없으면 macOS 알림만 띄우고 끝납니다.
-3. 새 파일이 있으면 A1~A6 → `output/reports/<N>호_….html` 검토본을 만들고, 노션 토큰이 있으면
-   노션 DB에 **초안**으로도 올립니다. 리포트를 자동으로 발행 상태로 바꾸지는 않습니다(C5).
-4. 검토 후 노션에서 상태를 직접 바꿉니다. 반려했다면 그 사유를 `output/state.json`의
+3. 새 파일이 있으면 A1~A6 → `output/reports/<N>호_….html` 검토본을 만듭니다.
+   HTML 안에는 검증된 public projection이 `application/json`으로 포함되지만 화면에는 표시되지 않습니다.
+4. 리포트 PR이 사람 검토 후 `main`에 병합되면, 노션톡 뉴스레터의 일일 GitHub Actions가
+   새 HTML을 감지해 공개 페이지와 bookmark-only Notion 원장을 멱등 생성합니다.
+5. 반려했다면 그 사유를 `output/state.json`의
    `rejections`에 적어 두면 다음 호 프롬프트에 주입됩니다.
+
+기존 TalkInsight 전용 Notion DB에 초안을 복제하는 경로는 이중 원장을 피하기 위해 기본으로 끄고,
+필요할 때만 `--legacy-notion-draft`로 실행합니다.
 
 사이클 상태(지난 호가 다룬 마지막 시각, 호수, 처리한 파일)는 `output/state.json`에 있습니다.
 launchd 설치는 `launchd/com.talkinsight.collect_publish.plist` 머리말을 보세요.
+
+### 리포트 HTML에 newsletter projection 포함하기
+
+A6 `final.json`은 근거 ID와 로컬 산출물 정보를 포함할 수 있으므로 그대로 GitHub에
+올리지 않습니다. 다음 명령은 공개 허용 필드만 새 객체로 만들고 PII·기간·항목 수·
+canonical SHA-256을 다시 검사합니다. `generated_at`도 해시 대상이므로 같은 입력을
+재현하려면 같은 RFC 3339 값을 넘겨야 합니다.
+
+기존 A6 파일은 다시 A6를 실행해야 합니다. 새 A6는 적용한 consent mode, 입력에서 검증한
+기간 경계, exact payload digest를 `privacy_evidence`에 기록하며, builder는 이 증거가 없거나
+현재 설정·요청 기간과 다르거나 payload가 바뀌었으면 공개 projection을 만들지 않습니다.
+이 SHA-256은 우발적인 변조·재라벨링을 탐지하는 provenance 무결성 장치이지 작성자 인증이
+아닙니다. 악의적인 작성자는 digest를 다시 만들 수 있으므로 upstream 보호 브랜치의 trusted
+gate와 독립 CODEOWNERS 리뷰가 실제 운영의 필수 신뢰 경계입니다.
+
+`run_cycle.py`가 A6 산출물에서 projection을 만든 뒤 같은 HTML에 포함하므로,
+리포트 PR 작성자는 기존처럼 `reports/*.html` 한 파일만 올리면 됩니다.
+별도 publication 브랜치·PR·GitHub token은 필요 없습니다.
+
+뉴스레터 정식 제목은 `노션하는 교사톡 주간 인사이트 N호`로 고정한다.
+사이음이 생성한 `hook_title`은 제목이 아니라 이메일·웹·Notion의 부제목으로 전달한다.
 
 ---
 

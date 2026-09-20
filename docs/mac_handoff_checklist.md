@@ -18,16 +18,10 @@
   설치했다. gemini-client만 `.venv/bin/python`으로 실행하고 나머지 스킬은
   여전히 시스템 python3로 돈다. cp39 휠이 있어 homebrew python은 불필요.)
 
-> **[2026-08-26 Mac 세션 실측] 이 항목은 이미 처리됐다.**
-> 이 Mac의 `python3`는 시스템 기본 **3.9.6**(`/usr/bin/python3`, homebrew python 없음)인데,
-> 코드는 Windows에서 **3.12** 기준으로 작성돼 있어 `X | None` 어노테이션(PEP 604)이
-> 런타임에 `TypeError`를 내며 전 스크립트가 죽었다. 21개 모듈 전부에
-> `from __future__ import annotations`를 넣어 해결했다(어노테이션이 지연 평가되어
-> 3.9에서도 동작). `|` 사용처 14곳이 **전부 어노테이션 자리**임을 AST로 확인했으므로
-> 이 한 줄로 완결이며, 별도 인터프리터 설치는 불필요하다.
-> 앞으로 새 .py를 추가할 때도 **첫 import로 `from __future__ import annotations`를 넣을 것**.
-> (참고: Python 3.9는 2025-10 EOL. V3에서 `google-genai` 설치 시 최소 버전 요구를
-> 확인하고, 3.9를 못 쓰면 그때 homebrew python 도입을 결정한다.)
+> **[2026-09-03 지원 버전 갱신]** Python 3.9는 지원하지 않는다. 프로젝트 최소 버전은
+> **3.10**, CI 검증 버전은 **3.12**다. 이 Mac의 시스템 `python3` 3.9.6으로 실행하지 말고
+> Homebrew 등으로 3.10+를 설치해 그 인터프리터로 `.venv`를 다시 만든다. 새 .py에는 계속
+> 첫 import로 `from __future__ import annotations`를 둔다.
 
 ## 1. 지금까지 상태 요약
 

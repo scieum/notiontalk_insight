@@ -28,6 +28,7 @@ def build_html(data: dict) -> str:
         n_discard=0,
         n_esc=0,
         n_nick=0,
+        publication_data="",
     )
 
 
@@ -130,6 +131,21 @@ class BrandContractTest(unittest.TestCase):
         self.assertNotIn("4.35rem", render_report.CSS)
         self.assertIn("grid-template-columns: repeat(auto-fit, minmax(7rem, 1fr))", render_report.CSS)
         self.assertIn("border-top: 1px solid var(--color-edge)", render_report.CSS)
+
+
+class PublicationEmbeddingTest(unittest.TestCase):
+    def test_embeds_machine_projection_without_visible_markup_or_script_breakout(self):
+        publication = {
+            "schema_version": 1,
+            "title": "</script><script>alert(1)</script>",
+            "intro": "A&B\u2028C",
+        }
+        embedded = render_report.publication_script(publication)
+        self.assertIn('id="talkinsight-publication"', embedded)
+        self.assertIn('type="application/json"', embedded)
+        self.assertNotIn("</script><script>", embedded)
+        self.assertIn("\\u003c/script\\u003e", embedded)
+        self.assertIn("A\\u0026B\\u2028C", embedded)
 
 
 if __name__ == "__main__":

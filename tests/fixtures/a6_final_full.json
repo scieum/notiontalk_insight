@@ -1,0 +1,122 @@
+{
+  "period_id": "synthetic-period-001",
+  "period_start": "2026-08-19",
+  "period_end": "2026-08-26",
+  "report": {
+    "hook_title": "데이터베이스 보기를 어떻게 정리할까요?",
+    "intro": "이번 주에는 보기 구성과 반복 업무 정리가 많이 다뤄졌습니다. 바로 적용할 수 있는 방법을 모았습니다.",
+    "title": "노션하는 교사톡 주간 리포트",
+    "sections": {
+      "stats": {
+        "메시지 수": 12,
+        "함께한 선생님": 4,
+        "스레드 수": 4,
+        "질문 수": 3,
+        "그중 해결된 수": 2
+      },
+      "topics": [
+        {
+          "topic": "데이터베이스 보기",
+          "why": "같은 자료를 용도별로 나누는 질문이 이어졌습니다.",
+          "source_thread_ids": ["thread-synthetic-01"]
+        },
+        {
+          "topic": "반복 업무 정리",
+          "why": "템플릿과 버튼을 함께 쓰는 방법을 공유했습니다.",
+          "source_thread_ids": ["thread-synthetic-02"]
+        }
+      ],
+      "resolved": [
+        {
+          "question": "보기마다 속성을 다르게 보일 수 있나요?",
+          "answer": "보기 속성 메뉴에서 표시할 속성을 고를 수 있습니다.",
+          "source_message_ids": [101]
+        }
+      ],
+      "unresolved": [
+        {
+          "question": "대규모 데이터베이스의 적정 보기 수는 몇 개인가요?",
+          "source_message_ids": [102]
+        }
+      ],
+      "decisions": [
+        {
+          "text": "다음 모임에서 예시를 더 모읍니다.",
+          "source_message_ids": [103]
+        }
+      ]
+    },
+    "source_thread_ids": ["thread-synthetic-01", "thread-synthetic-02"],
+    "local_path": "/private/value/that/must/not/be/copied"
+  },
+  "faq": [
+    {
+      "id": "faq-synthetic-01",
+      "question": "보기마다 속성을 다르게 보일 수 있나요?",
+      "answer": "보기 속성 메뉴에서 표시할 속성을 고를 수 있습니다.",
+      "tags": ["데이터베이스", "보기"],
+      "practical_tip": "표시 항목을 줄이면 모바일에서도 읽기 쉽습니다.",
+      "source_message_ids": [101],
+      "merge_into": null
+    },
+    {
+      "id": "faq-synthetic-02",
+      "question": "버튼으로 페이지를 만들 수 있나요?",
+      "answer": "버튼 작업에 페이지 추가 단계를 설정할 수 있습니다.",
+      "tags": ["버튼"],
+      "practical_tip": null,
+      "source_message_ids": [104],
+      "merge_into": null
+    }
+  ],
+  "tips": [
+    {
+      "id": "tip-synthetic-01",
+      "title": "보기 이름을 목적 중심으로 씁니다",
+      "body": "업무 단계나 사용하는 사람을 이름에 넣으면 찾기 쉽습니다.",
+      "feature_tags": ["데이터베이스"],
+      "practical_tip": null,
+      "source_message_ids": [105]
+    },
+    {
+      "id": "tip-synthetic-02",
+      "title": "버튼 작업을 작게 나눕니다",
+      "body": "한 버튼에는 확인하기 쉬운 작업만 묶습니다.",
+      "feature_tags": ["버튼", "자동화"],
+      "practical_tip": "복제본에서 먼저 확인합니다.",
+      "source_message_ids": [106]
+    }
+  ],
+  "actions": [
+    {
+      "id": "action-synthetic-01",
+      "type": "decision",
+      "text": "예시 데이터베이스를 다음 모임에서 검토합니다.",
+      "owner_nickname": null,
+      "due": null,
+      "source_message_ids": [107]
+    },
+    {
+      "id": "action-synthetic-02",
+      "type": "action",
+      "text": "보기 구성 사례를 한 가지 준비합니다.",
+      "owner_nickname": "함께한 선생님A",
+      "due": "2026-09-10",
+      "source_message_ids": [108]
+    }
+  ],
+  "evaluation": {
+    "verdict": "synthetic-only-and-must-not-be-copied"
+  },
+  "privacy_evidence": {
+    "evidence_version": 1,
+    "stage": "A6",
+    "consent_mode": "anon",
+    "pii_scan_passed": true,
+    "nickname_policy_passed": true,
+    "source_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "period_start": "2026-08-19",
+    "period_end": "2026-08-26",
+    "payload_sha256": "9b7b5999c18f44a26ff5d68fcbf66b79a870ac4ab0c9a7864cf5caa0d03ed3de"
+  }
+}

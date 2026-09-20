@@ -19,10 +19,18 @@ for _stream in (sys.stdout, sys.stderr):
 # 순서가 중요하다: 휴대폰 번호를 먼저 마스킹해야 이후 패턴이 이미 마스킹된
 # 자리표시자를 오탐하지 않는다 (references/pii_patterns.md 참조).
 _PATTERNS: list[tuple[str, "re.Pattern", str]] = [
-    ("mobile_phone", re.compile(r"01[0-9][- .]?\d{3,4}[- .]?\d{4}"), "[전화번호 마스킹]"),
-    ("landline_phone", re.compile(r"0(?:2|[3-6][1-5])[- .]?\d{3,4}[- .]?\d{4}"), "[전화번호 마스킹]"),
+    ("international_phone", re.compile(r"\+\d{1,3}[- .]?(?:\(\d{1,4}\)[- .]?|\d{1,4}[- .]?)\d{2,4}[- .]?\d{3,4}"), "[전화번호 마스킹]"),
+    ("mobile_phone", re.compile(r"(?:01[0-9]|\(01[0-9]\))[- .]?\d{3,4}[- .]?\d{4}"), "[전화번호 마스킹]"),
+    ("landline_phone", re.compile(r"(?:0(?:2|[3-6][1-5])|\(0(?:2|[3-6][1-5])\))[- .]?\d{3,4}[- .]?\d{4}"), "[전화번호 마스킹]"),
+    ("service_phone", re.compile(r"(?<!\d)1\d{3}[- .]?\d{4}(?!\d)"), "[전화번호 마스킹]"),
     ("email", re.compile(r"[\w.+-]+@[\w-]+\.[\w.-]+"), "[이메일 마스킹]"),
     ("rrn", re.compile(r"\d{6}-?[1-8]\d{6}"), "[주민번호 마스킹]"),
+    ("notion_token", re.compile(r"\b(?:ntn_[A-Za-z0-9_-]{20,}|secret_[A-Za-z0-9_-]{20,})\b"), "[비밀 토큰 마스킹]"),
+    ("github_token", re.compile(r"\b(?:gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,})\b"), "[비밀 토큰 마스킹]"),
+    ("oauth_token", re.compile(r"\bya29\.[A-Za-z0-9_-]{20,}\b"), "[비밀 토큰 마스킹]"),
+    ("jwt", re.compile(r"\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\b"), "[비밀 토큰 마스킹]"),
+    ("local_path", re.compile(r"(?:(?:[A-Za-z]:[/\\]|\\\\|/(?:Users|home|private|tmp|var|etc|mnt|Volumes)/|~[/\\]|\.\.?/)[^\s\"']+)"), "[로컬 경로 마스킹]"),
+    ("bare_notion_share", re.compile(r"(?<![\w.-])(?:www\.)?notion\.(?:so|site)/[^\s<>'\"]+", re.I), "[노션 공유 링크 마스킹]"),
 ]
 
 _NOTION_URL_QUERY_RE = re.compile(r"(https?://[\w.-]*notion\.so/\S+?)\?[^\s\]\)]*")
