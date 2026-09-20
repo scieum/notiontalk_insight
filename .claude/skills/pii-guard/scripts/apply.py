@@ -257,6 +257,20 @@ def run(input_path: Path, output_path: Path | None = None) -> dict:
             else:
                 result[kind].append(processed)
 
+    # A4가 센 질문 수는 **초안 기준**이다. A5 폐기/에스컬레이션과 위 재검사 보류를
+    # 거치고 나면 실제 발행 항목 수와 어긋난다. 공개 projection의 계약은 "stats는
+    # 실제로 실린 항목 수"이므로(lib/publication.py), 최종 목록 기준으로 다시 센다.
+    if isinstance(result["report"], dict):
+        sections = result["report"].get("sections")
+        if isinstance(sections, dict) and isinstance(sections.get("stats"), dict):
+            unresolved = sections.get("unresolved")
+            n_unresolved = len(unresolved) if isinstance(unresolved, list) else 0
+            stats = sections["stats"]
+            if "질문 수" in stats:
+                stats["질문 수"] = len(result["faq"]) + n_unresolved
+            if "그중 해결된 수" in stats:
+                stats["그중 해결된 수"] = len(result["faq"])
+
     # Bind the privacy claims to this exact A6 output.  Downstream publication
     # projection must verify this digest and the applied mode; reading the
     # current consent config alone cannot prove what A6 actually processed.
