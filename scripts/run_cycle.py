@@ -109,7 +109,10 @@ def run(stage: str, script: Path, *args: str, timeout: int = 3600) -> str:
     """스킬 스크립트를 같은 인터프리터(.venv)로 부른다. 실패하면 StageFailed."""
     cmd = [sys.executable, str(script), *args]
     print(f"[{stage}] {script.name} {' '.join(args)}")
-    proc = subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True, timeout=timeout)
+    # encoding 고정 — 생략하면 Windows에서 로케일 코드페이지(cp949)로 디코딩해
+    # 한글 산출물에서 UnicodeDecodeError가 난다.
+    proc = subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True,
+                          encoding="utf-8", errors="replace", timeout=timeout)
     tail = "\n".join(line for line in proc.stdout.splitlines()
                      if "Warning" not in line and "warnings.warn" not in line)[-1500:]
     if tail:

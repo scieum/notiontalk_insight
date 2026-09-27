@@ -188,8 +188,10 @@ def data_range(period_id: str, since: str | None, until: str | None) -> tuple[st
         finally:
             conn.close()
 
-    start = (since or lo or "")[:10]
-    end = (until or hi or lo or since or "")[:10]
+    # 실제 메시지 경계를 우선한다. 요청 경계(since/until)는 지난 호 끝·다음 사이클
+    # 시작처럼 열린 값이어서, 그대로 쓰면 메시지가 없는 날짜가 라벨·파일명에 박힌다.
+    start = (lo or since or "")[:10]
+    end = (hi or until or lo or since or "")[:10]
     return start, end
 
 

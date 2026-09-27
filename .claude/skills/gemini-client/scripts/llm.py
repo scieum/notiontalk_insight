@@ -82,6 +82,7 @@ def _call_claude(prompt: str, timeout_ms: int, model: str) -> tuple[str, int]:
     try:
         proc = subprocess.run(
             cmd, input=prompt, capture_output=True, text=True,
+            encoding="utf-8", errors="replace",  # 로케일 코드페이지로 디코딩되면 한글이 깨진다
             cwd=CLAUDE_CWD, env=env, timeout=timeout_ms / 1000,
         )
     except subprocess.TimeoutExpired as e:

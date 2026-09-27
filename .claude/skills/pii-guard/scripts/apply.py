@@ -114,7 +114,13 @@ def resolve_period_bounds(
     since: str | None = None,
     until: str | None = None,
 ) -> tuple[str, str]:
-    """Bind A6 evidence to the requested slice, filling open bounds from its DB rows."""
+    """Bind A6 evidence to the slice the issue actually covers.
+
+    발행되는 기간 라벨은 실제로 실린 메시지 범위여야 한다. 요청 경계(since/until)는
+    보통 지난 호 끝·다음 사이클 시작처럼 열린 값이라, 그대로 쓰면 메시지가 한 건도
+    없는 날짜가 라벨에 들어간다(5호에서 09-20·09-28이 그렇게 붙었다).
+    그래서 DB 행이 있으면 그 MIN/MAX를 쓰고, 행이 없을 때만 요청 경계로 되돌린다.
+    """
     lo = hi = None
     if Path(db_path).exists():
         conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
@@ -131,8 +137,8 @@ def resolve_period_bounds(
         finally:
             conn.close()
 
-    start_raw = since or lo
-    end_raw = until or hi
+    start_raw = lo or since
+    end_raw = hi or until
     if not isinstance(start_raw, str) or not isinstance(end_raw, str):
         raise ValueError("A6 period bounds require since/until or matching message rows")
     try:
