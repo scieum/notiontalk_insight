@@ -1,8 +1,8 @@
 """A1 (txt 경로): 카카오톡 공식 내보내기 txt를 공통 정규화 스키마로 변환한다.
 
 설계서 §2.4 A1. 형식이 실기기로 검증되지 않았으므로(§6 O1'''),
-references/kakao_txt_formats.md에 정리된 두 알려진 형식(A: 쉼표 구분,
-B: 대괄호+별도 날짜헤더)을 순서대로 시도한다. 실제 Mac 내보내기 샘플을
+references/kakao_txt_formats.md에 정리된 세 형식(A: 쉼표+12시간제,
+C: 쉼표+24시간제(PC 내보내기), B: 대괄호+별도 날짜헤더)을 순서대로 시도한다. 실제 Mac 내보내기 샘플을
 확보하면 이 파일의 정규식과 kakao_txt_formats.md를 함께 갱신할 것.
 
 성공 기준 (설계서 §2.4 A1):
@@ -55,6 +55,23 @@ FORMAT_B_MSG_RE = re.compile(
     r"^\[(?P<name>.+?)\]\s*\[(?P<ap>오전|오후)\s*(?P<h>\d{1,2}):(?P<mi>\d{2})\]\s*(?P<text>.*)$"
 )
 
+# 형식 C: "2026. 9. 28. 07:53, 홍길동 : 메시지" — 형식 A와 같은 쉼표 구분이지만
+# 오전/오후 없는 **24시간제**다. PC(Windows) 카카오톡 "대화 내용 저장"에서 나온다
+# (실기기 샘플로 확인, 2026-09-28). 형식 A 정규식은 오전|오후를 필수로 요구해
+# 이 형식을 한 줄도 못 잡고, 그러면 모든 줄이 미파싱 폴백으로 흘러 0건이 된다.
+FORMAT_C_RE = re.compile(
+    r"^(?P<y>\d{4})\.\s*(?P<mo>\d{1,2})\.\s*(?P<d>\d{1,2})\.\s*"
+    r"(?P<h>\d{1,2}):(?P<mi>\d{2}),\s*"
+    r"(?P<name>[^:]+?)\s*:\s*(?P<text>.*)$"
+)
+
+# 형식 C의 발신자 없는 시스템 메시지: "2026. 9. 28. 09:35: 홍길동님이 들어왔습니다."
+# 형식 A 변형과 달리 시각 뒤가 쉼표가 아니라 **콜론**이라 따로 잡아야 한다.
+FORMAT_C_SYSTEM_RE = re.compile(
+    r"^(?P<y>\d{4})\.\s*(?P<mo>\d{1,2})\.\s*(?P<d>\d{1,2})\.\s*"
+    r"(?P<h>\d{1,2}):(?P<mi>\d{2}):\s*(?P<text>.*)$"
+)
+
 # 형식 A의 시스템 메시지 변형: 발신자 없이 "날짜, 텍스트" (이름:콜론 구조가 없음).
 # 일반 메시지와 구분하기 위해 SYSTEM_KEYWORDS가 포함될 때만 이 패턴을 인정한다.
 FORMAT_A_SYSTEM_RE = re.compile(
@@ -64,7 +81,10 @@ FORMAT_A_SYSTEM_RE = re.compile(
 
 # 헤더/메타 라인 (파싱률 분모에서 제외). 첫 줄("<방이름> 님과 카카오톡 대화")은
 # 방 이름이 가변이라 접두사 매칭이 불가능해 접미사로 잡는다(실기기 샘플로 확인, 2026-08-31).
-SKIP_LINE_RE = re.compile(r"^(카카오톡 대화|저장한 날짜\s*:)|님과 카카오톡 대화$")
+# PC 내보내기는 첫 줄이 파일명("Talk_2026.9.28 09:35-5.txt")이다(2026-09-28 샘플).
+SKIP_LINE_RE = re.compile(
+    r"^(카카오톡 대화|저장한 날짜\s*:)|님과 카카오톡 대화$|^Talk_.+\.txt$"
+)
 
 
 def _to_24h(ap: str, h: int) -> int:
@@ -89,7 +109,8 @@ def parse_txt(path: Path) -> tuple[list[NormalizedMessage], dict]:
     current_date: Optional[tuple[int, int, int]] = None
     unmatched_samples: list[str] = []
 
-    with open(path, encoding="utf-8", errors="replace") as f:
+    # utf-8-sig: PC 내보내기 첫 줄에 BOM이 붙어 있어 헤더 스킵이 빗나간다.
+    with open(path, encoding="utf-8-sig", errors="replace") as f:
         for raw_line in f:
             line = raw_line.rstrip("\n\r")
             stripped = line.strip()
@@ -115,6 +136,29 @@ def parse_txt(path: Path) -> tuple[list[NormalizedMessage], dict]:
                     int(m.group("mo")),
                     int(m.group("d")),
                     _to_24h(m.group("ap"), int(m.group("h"))),
+                    int(m.group("mi")),
+                )
+                text = m.group("text")
+                messages.append(
+                    NormalizedMessage(
+                        ts=ts,
+                        nickname=m.group("name").strip(),
+                        text=text,
+                        is_system=_is_system_text(text),
+                        src="txt",
+                        links=_extract_links(text),
+                    )
+                )
+                stats["matched"] += 1
+                continue
+
+            m = FORMAT_C_RE.match(stripped)
+            if m:
+                ts = datetime(
+                    int(m.group("y")),
+                    int(m.group("mo")),
+                    int(m.group("d")),
+                    int(m.group("h")),
                     int(m.group("mi")),
                 )
                 text = m.group("text")
@@ -162,6 +206,29 @@ def parse_txt(path: Path) -> tuple[list[NormalizedMessage], dict]:
                     int(m.group("mo")),
                     int(m.group("d")),
                     _to_24h(m.group("ap"), int(m.group("h"))),
+                    int(m.group("mi")),
+                )
+                messages.append(
+                    NormalizedMessage(
+                        ts=ts,
+                        nickname=None,
+                        text=m.group("text"),
+                        is_system=True,
+                        src="txt",
+                        links=[],
+                    )
+                )
+                stats["matched"] += 1
+                continue
+
+            # 형식 C의 발신자 없는 시스템 메시지: "날짜 HH:MM: 텍스트"
+            m = FORMAT_C_SYSTEM_RE.match(stripped)
+            if m and _is_system_text(m.group("text")):
+                ts = datetime(
+                    int(m.group("y")),
+                    int(m.group("mo")),
+                    int(m.group("d")),
+                    int(m.group("h")),
                     int(m.group("mi")),
                 )
                 messages.append(

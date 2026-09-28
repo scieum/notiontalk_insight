@@ -40,13 +40,41 @@ GAP_AMBIGUOUS_MIN_SECONDS = 15 * 60
 MAX_THREAD_SIZE = 200
 
 
-def load_period_messages(period_id: str, db_path: Path = MESSAGES_DB_PATH) -> list[dict]:
+def _messages_query(
+    period_id: str, since: str | None, until: str | None
+) -> tuple[str, tuple]:
+    """발행 구간을 고르는 SQL. since/until이 있으면 **시간 범위**로 고른다.
+
+    period_id는 merge 배치 라벨이다(한 merge 실행 = 한 period, 배치 최소 ts로 명명).
+    그래서 같은 주를 두 번 내보내 넣으면 — 누락분을 보충할 때가 그렇다 — 한 주가
+    여러 period_id로 쪼개지고, period_id만으로 고르면 일부만 잡힌다. 실제로 5호에서
+    9/21~9/27 261건이 2026-09-21_A(158) / 2026-04-28_A(98) / 2026-03-26_A(5)로
+    갈라졌다. 발행 구간의 정의는 시간 범위이므로(A4도 --since/--until을 쓴다)
+    범위가 주어지면 배치 라벨을 무시한다.
+    """
+    cols = "SELECT id, ts, nickname, text, is_system, reply_to FROM messages"
+    if since or until:
+        sql, params = cols + " WHERE 1=1", []
+        if since:
+            sql += " AND ts >= ?"
+            params.append(since)
+        if until:
+            sql += " AND ts < ?"
+            params.append(until)
+        return sql + " ORDER BY ts, id", tuple(params)
+    return cols + " WHERE period_id = ? ORDER BY ts, id", (period_id,)
+
+
+def load_period_messages(
+    period_id: str,
+    db_path: Path = MESSAGES_DB_PATH,
+    since: str | None = None,
+    until: str | None = None,
+) -> list[dict]:
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
     rows = conn.execute(
-        "SELECT id, ts, nickname, text, is_system, reply_to FROM messages"
-        " WHERE period_id = ? ORDER BY ts, id",
-        (period_id,),
+        *_messages_query(period_id, since, until),
     ).fetchall()
     conn.close()
     return [dict(r) for r in rows]
@@ -135,8 +163,14 @@ def build_output(period_id: str, threads: list[list[dict]], ambiguous: list[dict
     return {"period_id": period_id, "threads": thread_objs, "ambiguous_boundaries": ambiguous}
 
 
-def run(period_id: str, db_path: Path = MESSAGES_DB_PATH, output_dir: Path = THREADS_DIR) -> Path:
-    messages = load_period_messages(period_id, db_path)
+def run(
+    period_id: str,
+    db_path: Path = MESSAGES_DB_PATH,
+    output_dir: Path = THREADS_DIR,
+    since: str | None = None,
+    until: str | None = None,
+) -> Path:
+    messages = load_period_messages(period_id, db_path, since, until)
     if not messages:
         log_event("A3", "skip", period_id=period_id, detail="구간에 메시지 없음")
         raise SystemExit(f"구간 {period_id}에 메시지가 없습니다")
@@ -165,8 +199,10 @@ def run(period_id: str, db_path: Path = MESSAGES_DB_PATH, output_dir: Path = THR
 def main() -> None:
     parser = argparse.ArgumentParser(description="A3 1차: 규칙 기반 스레드 분할")
     parser.add_argument("period_id")
+    parser.add_argument("--since", help="발행 구간 시작(포함). 주면 period_id 대신 시간 범위로 고른다")
+    parser.add_argument("--until", help="발행 구간 끝(미포함)")
     args = parser.parse_args()
-    run(args.period_id)
+    run(args.period_id, since=args.since, until=args.until)
 
 
 if __name__ == "__main__":

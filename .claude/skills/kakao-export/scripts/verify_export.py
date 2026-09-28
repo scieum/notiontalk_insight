@@ -63,6 +63,12 @@ FORMAT_A_RE = re.compile(
     r"(?P<ap>오전|오후)\s*(?P<h>\d{1,2}):(?P<mi>\d{2}),\s*"
     r"(?P<name>[^:]+?)\s*:\s*(?P<text>.*)$"
 )
+# 형식 C: 쉼표 구분 + 24시간제(PC 내보내기). parse_txt.py FORMAT_C_RE와 동일 기준.
+FORMAT_C_RE = re.compile(
+    r"^(?P<y>\d{4})\.\s*(?P<mo>\d{1,2})\.\s*(?P<d>\d{1,2})\.\s*"
+    r"(?P<h>\d{1,2}):(?P<mi>\d{2}),\s*"
+    r"(?P<name>[^:]+?)\s*:\s*(?P<text>.*)$"
+)
 FORMAT_B_DATE_RE = re.compile(r"(?P<y>\d{4})년\s*(?P<mo>\d{1,2})월\s*(?P<d>\d{1,2})일")
 FORMAT_B_MSG_RE = re.compile(
     r"^\[(?P<name>.+?)\]\s*\[(?P<ap>오전|오후)\s*(?P<h>\d{1,2}):(?P<mi>\d{2})\]\s*(?P<text>.*)$"
@@ -141,6 +147,18 @@ def scan(path: Path) -> dict:
                 ts = datetime(
                     int(m["y"]), int(m["mo"]), int(m["d"]),
                     _to_24h(m["ap"], int(m["h"])), int(m["mi"]),
+                )
+                if latest is None or ts > latest:
+                    latest = ts
+                continue
+
+            m = FORMAT_C_RE.match(stripped)
+            if m:
+                fmt = fmt or "C"
+                count += 1
+                ts = datetime(
+                    int(m["y"]), int(m["mo"]), int(m["d"]),
+                    int(m["h"]), int(m["mi"]),
                 )
                 if latest is None or ts > latest:
                     latest = ts
