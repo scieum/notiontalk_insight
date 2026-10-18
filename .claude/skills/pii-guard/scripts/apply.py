@@ -36,6 +36,7 @@ from lib.common.consent import get_consent_mode
 from lib.common.escalate import escalate
 from lib.common.log import log_event
 from lib.common.paths import DOCS_DIR, INSIGHTS_DIR, MESSAGES_DB_PATH
+from lib.publication import ANON_OWNER_RE, normalize_operator_names
 
 
 _ADMIN_SECTION_RE = re.compile(r"^##\s*운영진 닉네임\s*$(.*?)(?=^##\s|\Z)", re.M | re.S)
@@ -167,7 +168,8 @@ def process_item(item, nickname_map: dict[str, str], mode: str):
         text, _counts = mask.mask_text(text)
         if mode == "anon":
             text = anonymize.anonymize_text(text, nickname_map)
-        return text
+        # 운영진은 익명화 예외라 원래 닉네임이 남아 있다 — 공개 표기로 통일한다.
+        return normalize_operator_names(text)
 
     return _transform_strings(item, _pipeline)
 
@@ -255,7 +257,8 @@ def run(input_path: Path, output_path: Path | None = None) -> dict:
             issues = verify_item(processed, nickname_map, mode)
             if kind == "actions" and mode == "anon":
                 owner = processed.get("owner_nickname") if isinstance(processed, dict) else None
-                if owner is not None and not re.fullmatch(r"함께한 선생님[A-Z]+", owner):
+                # 가명 또는 운영진 공개 표기만 허용 — 공개 계약(lib/publication.py)과 같은 규칙.
+                if owner is not None and not ANON_OWNER_RE.fullmatch(owner):
                     issues.append("익명 action owner가 승인된 가명 형식이 아님")
             item_id = item.get("id") or "?"
             if issues:

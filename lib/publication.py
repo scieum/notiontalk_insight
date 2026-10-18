@@ -35,7 +35,27 @@ COLLECTION_LIMITS = {
 }
 CONTENT_ID_RE = re.compile(r"^insight-\d{8}-\d{8}(?:-r[1-9]\d*)?$")
 SLUG_RE = re.compile(r"^community-insight-\d{3,}(?:-r[1-9]\d*)?$")
-ANON_OWNER_RE = re.compile(r"^(?:1000쌤|함께한 선생님[A-Z]+)$")
+# 운영진 공개 표기(docs/room_profile.md 운영진 표 — 등록 자체가 공개 동의, G-C).
+# 채팅 닉네임은 "곰곰이샘(4-1)"처럼 꾸밈이 붙고 LLM도 제각각 줄여 쓰므로,
+# A6가 normalize_operator_names()로 이 세 표기로 통일한 뒤 공개한다.
+OPERATOR_DISPLAY_NAMES = ("1000쌤", "곰곰이쌤", "케미가체질쌤")
+_OPERATOR_ALIASES = (
+    (re.compile(r"1000쌤(?:\s*\(정보부장\))?"), "1000쌤"),
+    (re.compile(r"곰곰이\s?[샘쌤](?:\s*\(4-1\))?"), "곰곰이쌤"),
+    (re.compile(r"케미가\s?체질(?:\s*\(하연T\))?(?:\s?[쌤샘])?|케미[쌤샘]"), "케미가체질쌤"),
+)
+_OPERATOR_ALT = "|".join(OPERATOR_DISPLAY_NAMES)
+# 운영진이 함께 맡은 일은 "1000쌤, 곰곰이쌤, 케미가체질쌤"처럼 여러 명을 적는다.
+ANON_OWNER_RE = re.compile(
+    rf"^(?:{_OPERATOR_ALT}|함께한 선생님[A-Z]+)(?:, (?:{_OPERATOR_ALT}))*$"
+)
+
+
+def normalize_operator_names(text: str) -> str:
+    """운영진 닉네임 변형을 공개 표기(OPERATOR_DISPLAY_NAMES)로 바꾼다."""
+    for pattern, display in _OPERATOR_ALIASES:
+        text = pattern.sub(display, text)
+    return text
 PUBLICATION_PATH_RE = re.compile(
     r"^publications/(?P<content_id>insight-\d{8}-\d{8}(?:-r[1-9]\d*)?)/publication\.json$"
 )
@@ -390,7 +410,7 @@ def _privacy_pattern_errors(value: str, location: str, *, consent_mode: Any) -> 
             errors.append(f"{location} contains forbidden {name}")
     if consent_mode == "anon":
         scrubbed = re.sub(
-            r"1000쌤|함께한 선생님[A-Z]+|선생님|관리자님|운영자님",
+            rf"{_OPERATOR_ALT}|함께한 선생님[A-Z]+|선생님|관리자님|운영자님",
             "",
             value,
         )
