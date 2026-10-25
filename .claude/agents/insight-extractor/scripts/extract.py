@@ -109,6 +109,12 @@ def _call_with_schema_retry(build_prompt, validate, generate_fn, label: str):
     return None, MAX_SCHEMA_RETRIES + 1, schema_error
 
 
+def _normalize_due(due):
+    """기한은 공개 계약상 YYYY-MM-DD만 허용된다. LLM이 시각을 붙이면 날짜만, 날짜가 아니면 null."""
+    m = re.match(r"\d{4}-\d{2}-\d{2}", due) if isinstance(due, str) else None
+    return m.group(0) if m else None
+
+
 def _aggregate(thread_results: list[dict]) -> dict:
     """배치 결과들을 draft.json의 faq/tips/actions 배열로 펼치고 id를 부여한다."""
     faq, tips, actions, unresolved = [], [], [], []
@@ -149,7 +155,7 @@ def _aggregate(thread_results: list[dict]) -> dict:
                     "type": item.get("type", "action"),
                     "text": item.get("text", ""),
                     "owner_nickname": item.get("owner_nickname"),
-                    "due": item.get("due"),
+                    "due": _normalize_due(item.get("due")),
                     "source_message_ids": item["source_message_ids"],
                     "thread_id": tid,
                 }

@@ -37,6 +37,7 @@ sys.path.insert(0, str(_ROOT / ".claude/skills/kb-search/scripts"))
 sys.path.insert(0, str(_ROOT / ".claude/agents/insight-extractor/scripts"))
 
 import eval_prompt  # 파일명이 prompt.py면 insight-extractor의 동명 모듈과 충돌한다
+from extract import _normalize_due
 
 from lib.common.consent import get_consent_mode
 from lib.common.escalate import escalate
@@ -315,6 +316,8 @@ def run(
             for n, it in enumerate(fresh[key], 1):
                 it["id"] = f"{key[0].upper()}{n}-r-{tid}"
                 it["thread_id"] = tid
+                if key == "actions":
+                    it["due"] = _normalize_due(it.get("due"))
                 new_items.append((it, key))
         if not new_items:
             log_event("A5", "skip", detail=f"스레드 {tid} 재생성 결과가 0건 — 원본 항목 폐기", period_id=sid)
