@@ -78,7 +78,10 @@ def _call_claude(prompt: str, timeout_ms: int, model: str) -> tuple[str, int]:
     CLAUDE_CWD.mkdir(parents=True, exist_ok=True)
     env = dict(os.environ)
     env.pop("CLAUDECODE", None)  # Claude Code 세션 안에서 불려도 중첩 실행을 허용
-    cmd = [_claude_exe(), "-p", "--output-format", "json", "--model", model, "--tools", ""]
+    # --strict-mcp-config: 사용자 계정의 MCP 커넥터 도구 정의가 매 호출에 실려
+    # 2026-11-02에 요청이 ~1.6M 토큰으로 한도를 넘었다. 생성·평가엔 도구가 필요 없다.
+    cmd = [_claude_exe(), "-p", "--output-format", "json", "--model", model, "--tools", "",
+           "--strict-mcp-config"]
     try:
         proc = subprocess.run(
             cmd, input=prompt, capture_output=True, text=True,
